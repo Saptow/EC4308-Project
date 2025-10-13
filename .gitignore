@@ -47,3 +47,13 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# Python-related
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+venv
+.venv
