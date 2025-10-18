@@ -64,3 +64,38 @@ summary(arima_bic2)
 # AIC = -311.73
 # BIC = -284.55
 
+###########################################################################################
+# Based on the earlier discussion, we pick our benchmark ARIMA as ARIMA(1,1,2)(2,0,1)[12] 
+###########################################################################################
+
+# Out of sample evaluation for benchmark ARIMA using rolling window
+library(forecast)
+
+test$forecast <- NA_real_
+model_summaries <- list()
+
+for (i in as.numeric(rownames(test))) {
+  train = ts(uemploy_monthly[(i-360):(i-1), 2], frequency = 12)
+  model_fit = arima(train, order = c(1,1,2), seasonal = list(order = c(2,0,1), period = 12))
+  model_summaries[[as.character(i)]] = summary(model_fit)
+  y_hat = forecast(model_fit, h=1)$mean[1]
+  test$forecast[rownames(test) == i] = as.numeric(y_hat)
+}
+
+test['squared_error'] = (test['unemployment_rate']-test['forecast'])^2
+rsme_benchmark = sqrt(mean(test$squared_error, na.rm = TRUE))
+rsme_benchmark
+
+# Plot of forecast vs actual
+plot(as.Date(test$month), test$unemployment_rate, type = "l", col = "blue",
+     xlab = "Month", ylab = "Unemployment Rate", main = "Actual vs Benchmark Forecast")
+lines(as.Date(test$month), test$forecast, col = "red", lty = 2, lwd = 2)
+legend("topright", legend = c("Actual", "Forecast"),col = c("blue", "red"),
+       lty = c(1, 2), bty = "n")
+
+
+
+
+
+
+
