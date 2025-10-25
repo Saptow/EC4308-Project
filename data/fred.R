@@ -1,10 +1,24 @@
-library(fbi)
-file_md <- "https://research.stlouisfed.org/econ/mccracken/fred-databases/Monthly/current.csv"
+# Quick setup of the fbi library
+# install.packages("devtools") # install this so you can install github repos
+# Other prerequisites to install
+# install.packages("stats")
+# install.packages("readr")
+# install.packages("pracma")
+# devtools::install_github("cykbennie/fbi") # install fbi from github
 
+# Load fbi library
+library(fbi)
+
+# Read fredMD data and apply respective transformations
 md=fredmd(
-    file='C:/Users/rob-l/Documents/NUS/Y4S1/EC4308/EC4308-Project/data/2025-09-MD.csv', 
+    file='./data/2025-09-MD.csv', 
     date_start=as.Date("1980-01-01"),
-    date_end=as.Date("2020-01-01"),
+    date_end=as.Date("2019-12-01"),
     transform=TRUE
 )
-md
+
+# Save the processed data as an R data file
+save(md, file = "./data/fredmd.RData")
+
+# To load the data in future sessions, use:
+# load("./data/fredmd.RData")
