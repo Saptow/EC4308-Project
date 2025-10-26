@@ -1,6 +1,6 @@
-# Quick setup of the fbi library
+## Quick setup of the fbi library
 # install.packages("devtools") # install this so you can install github repos
-# Other prerequisites to install
+## Other prerequisites to install
 # install.packages("stats")
 # install.packages("readr")
 # install.packages("pracma")
