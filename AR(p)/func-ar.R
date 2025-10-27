@@ -82,7 +82,7 @@ ar.rolling.window=function(Y,nprev,indice=1,lag=1,type="fixed"){
   for(i in nprev:1){  #NB: backwards FOR loop: going from 180 down to 1
     
     Y.window=Y[(1+nprev-i):(nrow(Y)-i),] #define the estimation window (first one: 1 to 491, then 2 to 492 etc.)
-    fact=runAR(Y.window,indice,lag) #call the function to fit the AR(p) selected on BIC and generate h-step forecast
+    fact=runAR(Y.window,indice,lag, type) #call the function to fit the AR(p) selected on BIC and generate h-step forecast
     save.coef[(1+nprev-i),]=fact$coef #save estimated coefficients
     save.pred[(1+nprev-i),]=fact$pred #save the forecast
     cat("iteration",(1+nprev-i),"\n") #display iteration number
