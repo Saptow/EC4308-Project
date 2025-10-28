@@ -17,9 +17,6 @@
 
 runAR=function(Y,indice,lag,type="fixed"){
   
-  dum=Y[,ncol(Y)] # extract dummy from data
-  Y=Y[,-ncol(Y)] #data without the dummy
-  
   Y2=cbind(Y[,indice]) #Y variable (CPI if indice=1, or PCE-based inflation indice=2)
   aux=embed(Y2,4+lag) #create 4 lags + forecast horizon shift (=lag option)
   y=aux[,1] #  Y variable aligned/adjusted for missing data due do lags
@@ -32,23 +29,23 @@ runAR=function(Y,indice,lag,type="fixed"){
     X.out=tail(X.out,1)[1:ncol(X)] #last observations: y_T,y_t-1...y_t-h
   }
   
-  dum=tail(dum,length(y)) #cut the dummy to size to account for lost observations due to lags
+  #dum=tail(dum,length(y)) #cut the dummy to size to account for lost observations due to lags
   
   if(type=="fixed"){ #if fixed at AR(4)
-    model=lm(y~X+dum) #estimate direct h-step AR(4) by OLS with the dummy
+    model=lm(y~X) #estimate direct h-step AR(4) by OLS with the dummy
     coef=coef(model)[1:(ncol(X)+1)] #extract coefficients
   }
   
   if(type=="bic"){ #if selection on BIC
     bb=Inf #initialize the "best BIC" at a huge number
     for(i in seq(1,ncol(X),1)){ #try for every lag length 1:4
-      m=lm(y~X[,1:i]+dum) #estimate AR(i) by OLS with the dummy
+      m=lm(y~X[,1:i]) #estimate AR(i) by OLS with the dummy
       crit=BIC(m) #retrieve BIC
       if(crit<bb){ #if BIC improved
         bb=crit #updated the new best BIC
         model=m #save the model object
         ar.coef=coef(model) #save coefficients
-        ar.coef=ar.coef[-length(ar.coef)] #remove the dummy coefficient
+  
       }
     }
     coef=rep(0,ncol(X)+1) #blank vector for coefficients
