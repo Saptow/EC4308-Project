@@ -5,7 +5,7 @@
 
 #install.packages('vars')
 
-marx_transform = function(X, n_lag = 12, scale_data = TRUE) {
+marx_transform = function(X, n_lag = 12, scale_data = FALSE) {
   
   library(vars)
   n_var = ncol(X)
@@ -14,12 +14,14 @@ marx_transform = function(X, n_lag = 12, scale_data = TRUE) {
   
   # extract data matrix for VAR
   matata = as.matrix(var$datamat)
-  mat_y = matata[,1:n_var]
-  mat_x = matata[,-c(1:n_var)]
+  mat_y = matata[,1:n_var]      # current value of X
+  mat_x = matata[,-c(1:n_var)]  # Apply lag of X
   
-  #ex-ante scaling, may be desirable in certain applications, otherwise comemnt out
-  mat_y = as.matrix(scale(mat_y))
-  mat_x = as.matrix(scale(mat_x))
+  #ex-ante scaling, may be desirable in certain applications
+  if (scale_data) {
+    mat_y = as.matrix(scale(mat_y))
+    mat_x = as.matrix(scale(mat_x))
+  }
   
   mat_x_marx = mat_x
   for(l in 2:n_lag){
