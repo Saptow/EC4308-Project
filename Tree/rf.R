@@ -28,9 +28,39 @@ rf.rmse12=rf12c$errors[1]
 # Plotting actual vs predicted values
 dates = tail(Y$date, 120)
 plot(dates, oosy, type = "l", col = "black", lwd = 2,
-     ylab = "Unemployment rate", xlab = "Date",
+     ylab = "Change in Unemployment rate", xlab = "Date",
      main = "Random Forest Forecast vs Actual (1-step ahead)")
 lines(dates, rf1c$pred, col = "red", lwd = 2)
+legend("topright", legend = c("Actual", "Predicted"),
+       col = c("black", "red"),
+       lty = 1, lwd = 2)
+
+# Plotting actual vs predicted values
+dates = tail(Y$date, 120)
+plot(dates, oosy, type = "l", col = "black", lwd = 2,
+     ylab = "Change in Unemployment rate", xlab = "Date",
+     main = "Random Forest Forecast vs Actual (3-step ahead)")
+lines(dates, rf3c$pred, col = "red", lwd = 2)
+legend("topright", legend = c("Actual", "Predicted"),
+       col = c("black", "red"),
+       lty = 1, lwd = 2)
+
+# Plotting actual vs predicted values
+dates = tail(Y$date, 120)
+plot(dates, oosy, type = "l", col = "black", lwd = 2,
+     ylab = "Change in Unemployment rate", xlab = "Date",
+     main = "Random Forest Forecast vs Actual (6-step ahead)")
+lines(dates, rf6c$pred, col = "red", lwd = 2)
+legend("topright", legend = c("Actual", "Predicted"),
+       col = c("black", "red"),
+       lty = 1, lwd = 2)
+
+# Plotting actual vs predicted values
+dates = tail(Y$date, 120)
+plot(dates, oosy, type = "l", col = "black", lwd = 2,
+     ylab = "Change in Unemployment rate", xlab = "Date",
+     main = "Random Forest Forecast vs Actual (12-step ahead)")
+lines(dates, rf12c$pred, col = "red", lwd = 2)
 legend("topright", legend = c("Actual", "Predicted"),
        col = c("black", "red"),
        lty = 1, lwd = 2)
