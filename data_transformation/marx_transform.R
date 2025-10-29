@@ -3,6 +3,15 @@
 # Source: https://github.com/philgoucou/marx/blob/main/MARX_cheap_code.R
 # Reference: Goulet-Coulombe, P. (2019, 2020), "Macroeconomic Random Forests"
 
+# Function returns:
+  #   A list of 3 elements:
+  #     1. mat_y      - Matrix of current-period values for all variables (X_t/Y_t).
+  #     2. mat_x      - Matrix of raw lagged regressors (X_{t-1}, ..., X_{t-p}).
+  #     3. mat_x_marx - Matrix of MARX-transformed regressors, where each lag 
+  #                     is replaced by a moving average of its own past lags. 
+
+
+
 #install.packages('vars')
 
 marx_transform = function(X, n_lag = 12, scale_data = FALSE) {
