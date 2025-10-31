@@ -2,32 +2,47 @@
 
 # load FRED-MD data
 load("data/fredmd.RData")
+library(randomForest)
 
 Y = md
 Y = Y[,-59] #drop New Orders for Consumer Goods (ACOGNO) due to insufficient data
 nprev = 120
 idx = which(colnames(Y) == "UNRATE") # index for unemployment rate
-oosy = tail(yy, nprev)    
-#sum(is.na(Y))
-#which(rowSums(is.na(Y)) > 0)
-#Y[253:398, ]
-#which(is.na(Y[253:398, ]), arr.ind = TRUE)
 
+
+
+#Use random forest 1 (Going to take some time)
 source("Tree/func-rf.R")
 rf1c=rf.rolling.window(Y,nprev,idx,1)
 rf3c=rf.rolling.window(Y,nprev,idx,3)
 rf6c=rf.rolling.window(Y,nprev,idx,6)
 rf12c=rf.rolling.window(Y,nprev,idx,12)
 
+#Use random forest 2
+source("Tree/func-rf2.R")
+rf12c = rf2.rolling.window(Y,nprev,idx,1)
+rf32c = rf2.rolling.window(Y,nprev,idx,3)
+rf62c = rf2.rolling.window(Y,nprev,idx,6)
+rf122c = rf2.rolling.window(Y,nprev,idx,12)
+
+
+
 #See the RMSE:
 rf.rmse1=rf1c$errors[1]
+rf.rmse1
 rf.rmse3=rf3c$errors[1]
 rf.rmse6=rf6c$errors[1]
 rf.rmse12=rf12c$errors[1]
 
-# Plotting actual vs predicted values
+rf12c$errors[1]
+rf32c$errors[1]
+rf62c$errors[1]
+rf122c$errors[1]
+
+
+# Plotting actual vs predicted values h = 1
 dates = tail(Y$date, 120)
-plot(dates, oosy, type = "l", col = "black", lwd = 2,
+plot(dates, oosy$UNRATE, type = "l", col = "black", lwd = 2,
      ylab = "Change in Unemployment rate", xlab = "Date",
      main = "Random Forest Forecast vs Actual (1-step ahead)")
 lines(dates, rf1c$pred, col = "red", lwd = 2)
@@ -47,7 +62,7 @@ legend("topright", legend = c("Actual", "Predicted"),
 
 # Plotting actual vs predicted values
 dates = tail(Y$date, 120)
-plot(dates, oosy, type = "l", col = "black", lwd = 2,
+plot(oosy$date, oosy$UNRATE, type = "l", col = "black", lwd = 2,
      ylab = "Change in Unemployment rate", xlab = "Date",
      main = "Random Forest Forecast vs Actual (6-step ahead)")
 lines(dates, rf6c$pred, col = "red", lwd = 2)
@@ -64,4 +79,51 @@ lines(dates, rf12c$pred, col = "red", lwd = 2)
 legend("topright", legend = c("Actual", "Predicted"),
        col = c("black", "red"),
        lty = 1, lwd = 2)
+
+
+library(reshape2)
+library(ggplot2)
+
+# Extract the list of importance matrices
+imp_list <- rf1c$save.importance
+
+# (If your loop runs backward, reverse it so iteration 1 = earliest)
+imp_list <- rev(imp_list)
+
+# Combine into one matrix
+imp_mat <- do.call(cbind, lapply(imp_list, function(x) x[, "%IncMSE"]))
+
+# Set iteration labels as column names
+colnames(imp_mat) <- paste0("iter_", seq_len(ncol(imp_mat)))
+
+# Check what it looks like
+head(imp_mat[, 1:5])
+
+
+
+# Select top 15 variables by mean importance
+avg_imp <- rowMeans(imp_mat, na.rm = TRUE)
+top_vars <- names(sort(avg_imp, decreasing = TRUE))[1:15]
+imp_top <- imp_mat[top_vars, ]
+
+# Convert to long format for ggplot
+imp_long_top <- melt(imp_top, varnames = c("Variable", "Iteration"), value.name = "Importance")
+
+# Convert Iteration to numeric so we can control tick spacing
+imp_long_top$Iteration <- as.numeric(gsub("\\D", "", imp_long_top$Iteration))
+
+# Plot
+ggplot(imp_long_top, aes(x = Iteration, y = Variable, fill = Importance)) +
+  geom_tile() +
+  scale_fill_viridis_c(option = "C") +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Top 15 Variable Importances over Time (%IncMSE)",
+    x = "Rolling Iteration",
+    y = NULL
+  ) +
+  # Show tick marks every 10 iterations
+  scale_x_continuous(breaks = seq(0, max(imp_long_top$Iteration, na.rm = TRUE), by = 10))
+
+
 
