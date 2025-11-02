@@ -32,7 +32,7 @@ run_mafrf <- function(Y, h = 1, target_name = "UNRATE") {
   maf_rows <- t_idx - P_maf
   if (L_y > 0) {
     y_embed <- embed(y_in, L_y + 1)
-    y_lags  <- y_embed[, -1, drop = FALSE]  # y_{t-1},...,y_{t-L_y}
+    y_lags  <- y_embed[, -1, drop = FALSE]  
     y_rows  <- t_idx - L_y
     y_lags_aligned <- y_lags[y_rows, , drop = FALSE]
     colnames(y_lags_aligned) <- paste0("y_L", 1:L_y)

@@ -12,6 +12,7 @@ cutoff = as.Date("2010-11-01")
 Y$DUM = ifelse(Y[, 1] > cutoff, 1, 0)
 nprev = 120 #test size
 
+####################################################################################
 
 #Use random forest 2 (base)
 source("Tree/func-rf2.R")
@@ -27,14 +28,17 @@ marx_rf3 = marx_rf.rolling.window(Y, nprev, h=3, "UNRATE")
 marx_rf6 = marx_rf.rolling.window(Y, nprev, h=6, "UNRATE")
 marx_rf12 = marx_rf.rolling.window(Y, nprev, h=12, "UNRATE")
 
-#See the RMSE:
-rf12c$errors[1]
-rf32c$errors[1]
-rf62c$errors[1]
-rf122c$errors[1]
+#Use MAF random forest
+source("Tree/func-maf_rf.R")
+maf_rf1 = maf_rf.rolling.window(Y, nprev, h=1, "UNRATE")
+maf_rf3 = maf_rf.rolling.window(Y, nprev, h=3, "UNRATE")
+maf_rf6 = maf_rf.rolling.window(Y, nprev, h=6, "UNRATE")
+maf_rf12 = maf_rf.rolling.window(Y, nprev, h=12, "UNRATE")
 
 
-############################################################################
+
+
+##################################################################################
 # Plotting actual vs predicted values h = 1
 dates <- tail(Y[, 1], 120)
 actual <- tail(Y[, "UNRATE"], 120)
