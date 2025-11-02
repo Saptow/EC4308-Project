@@ -18,9 +18,9 @@ yy <- Y$UNRATE
 oosy  <- tail(yy, nprev)  
 
 
-# --- 2) Define y and X (no xts) -------------------------------------------
+# --- 2) Define y and X -------------------------------------------
 y_vec <- as.numeric(Y$UNRATE)
-X_df  <- Y[, setdiff(names(Y), c("UNRATE", "date")), drop = FALSE]  # keep dummy inside X
+X_df  <- Y[, setdiff(names(Y), c("UNRATE", "date")), drop = FALSE]
 
 # ensure numeric matrix
 stopifnot(all(sapply(X_df, is.numeric)))
