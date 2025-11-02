@@ -14,11 +14,11 @@ md=fredmd(
     file='./data/2025-09-MD.csv', 
     date_start=as.Date("1980-01-01"),
     date_end=as.Date("2019-12-01"),
-    transform=TRUE
+    transform=FALSE
 )
 
 # Save the processed data as an R data file
-save(md, file = "./data/fredmd.RData")
+save(md, file = "./data/raw_fredmd.RData")
 
 # To load the data in future sessions, use:
 # load("./data/fredmd.RData")
