@@ -6,8 +6,12 @@ library(randomForest)
 
 Y = md
 Y = Y[,-59] #drop New Orders for Consumer Goods (ACOGNO) due to insufficient data
-nprev = 120
-idx = which(colnames(Y) == "UNRATE") # index for unemployment rate
+
+#Create dummy variable after Nov 2010 to handle structural break
+cutoff = as.Date("2010-11-01")
+Y$DUM = ifelse(Y[, 1] > cutoff, 1, 0)
+nprev = 120 #test size
+
 
 
 
@@ -20,10 +24,10 @@ rf12c=rf.rolling.window(Y,nprev,idx,12)
 
 #Use random forest 2
 source("Tree/func-rf2.R")
-rf12c = rf2.rolling.window(Y,nprev,idx,1)
-rf32c = rf2.rolling.window(Y,nprev,idx,3)
-rf62c = rf2.rolling.window(Y,nprev,idx,6)
-rf122c = rf2.rolling.window(Y,nprev,idx,12)
+rf12c = rf2.rolling.window(Y,nprev,h=1, "UNRATE")
+rf32c = rf2.rolling.window(Y,nprev,h=3, "UNRATE")
+rf62c = rf2.rolling.window(Y,nprev,h=6, "UNRATE")
+rf122c = rf2.rolling.window(Y,nprev,h=12, "UNRATE")
 
 
 
@@ -40,46 +44,60 @@ rf62c$errors[1]
 rf122c$errors[1]
 
 
+############################################################################
 # Plotting actual vs predicted values h = 1
-dates = tail(Y$date, 120)
-plot(dates, oosy$UNRATE, type = "l", col = "black", lwd = 2,
-     ylab = "Change in Unemployment rate", xlab = "Date",
+dates <- tail(Y[, 1], 120)
+actual <- tail(Y[, "UNRATE"], 120)
+
+# Plot actual vs predicted (1-step ahead)
+plot(dates, actual, type = "l", col = "black", lwd = 2,
+     ylab = "Change in Unemployment Rate",
+     xlab = "Date",
      main = "Random Forest Forecast vs Actual (1-step ahead)")
-lines(dates, rf1c$pred, col = "red", lwd = 2)
-legend("topright", legend = c("Actual", "Predicted"),
-       col = c("black", "red"),
-       lty = 1, lwd = 2)
-
-# Plotting actual vs predicted values
-dates = tail(Y$date, 120)
-plot(dates, oosy, type = "l", col = "black", lwd = 2,
-     ylab = "Change in Unemployment rate", xlab = "Date",
-     main = "Random Forest Forecast vs Actual (3-step ahead)")
-lines(dates, rf3c$pred, col = "red", lwd = 2)
-legend("topright", legend = c("Actual", "Predicted"),
-       col = c("black", "red"),
-       lty = 1, lwd = 2)
-
-# Plotting actual vs predicted values
-dates = tail(Y$date, 120)
-plot(oosy$date, oosy$UNRATE, type = "l", col = "black", lwd = 2,
-     ylab = "Change in Unemployment rate", xlab = "Date",
-     main = "Random Forest Forecast vs Actual (6-step ahead)")
-lines(dates, rf6c$pred, col = "red", lwd = 2)
-legend("topright", legend = c("Actual", "Predicted"),
-       col = c("black", "red"),
-       lty = 1, lwd = 2)
-
-# Plotting actual vs predicted values
-dates = tail(Y$date, 120)
-plot(dates, oosy, type = "l", col = "black", lwd = 2,
-     ylab = "Change in Unemployment rate", xlab = "Date",
-     main = "Random Forest Forecast vs Actual (12-step ahead)")
 lines(dates, rf12c$pred, col = "red", lwd = 2)
-legend("topright", legend = c("Actual", "Predicted"),
+legend("topright",
+       legend = c("Actual", "RF"),
        col = c("black", "red"),
        lty = 1, lwd = 2)
 
+############################################################################
+# Plot actual vs predicted (3-step ahead)
+plot(dates, actual, type = "l", col = "black", lwd = 2,
+     ylab = "Change in Unemployment Rate",
+     xlab = "Date",
+     main = "Random Forest Forecast vs Actual (3-step ahead)")
+lines(dates, rf32c$pred, col = "red", lwd = 2)
+legend("topright",
+       legend = c("Actual", "RF"),
+       col = c("black", "red"),
+       lty = 1, lwd = 2)
+
+############################################################################
+# Plot actual vs predicted (6-step ahead)
+plot(dates, actual, type = "l", col = "black", lwd = 2,
+     ylab = "Change in Unemployment Rate",
+     xlab = "Date",
+     main = "Random Forest Forecast vs Actual (6-step ahead)")
+lines(dates, rf62c$pred, col = "red", lwd = 2)
+legend("topright",
+       legend = c("Actual", "RF"),
+       col = c("black", "red"),
+       lty = 1, lwd = 2)
+
+
+##############################################################################
+# Plot actual vs predicted (12-step ahead)
+plot(dates, actual, type = "l", col = "black", lwd = 2,
+     ylab = "Change in Unemployment Rate",
+     xlab = "Date",
+     main = "Random Forest Forecast vs Actual (12-step ahead)")
+lines(dates, rf122c$pred, col = "red", lwd = 2)
+legend("topright",
+       legend = c("Actual", "RF"),
+       col = c("black", "red"),
+       lty = 1, lwd = 2)
+
+##############################################################################
 
 library(reshape2)
 library(ggplot2)
