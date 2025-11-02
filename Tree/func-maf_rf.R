@@ -5,7 +5,7 @@
 run_mafrf <- function(Y, h = 1, target_name = "UNRATE") {
   L_y   = 4   # number of lags of y to keep
   P_maf = 4  # number of lags for each X in MAF
-  q_maf = 2   # number of PCs to keep per variable
+  
   
   # Drop date; split into train (1..T-1) and last row T for prediction
   Y <- Y[, -1, drop = FALSE]  # drop date column
@@ -19,7 +19,7 @@ run_mafrf <- function(Y, h = 1, target_name = "UNRATE") {
   # Apply MAF transformation on TRAIN X only
   source("data_transformation/maf_transform.R")  
   X_train_raw <- as.matrix(Y_in[, setdiff(seq_len(ncol(Y_in)), c(indice, dum_idx)), drop = FALSE])
-  maf_train <- maf_transform(X_train_raw, P_maf = P_maf, q_maf = q_maf)
+  maf_train <- maf_transform(X_train_raw, P_maf = P_maf, scale_data = TRUE)
   
   # Align features/target for h-step learning
   y_in <- as.numeric(Y_in[, indice, drop = TRUE])

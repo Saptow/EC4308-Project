@@ -1,10 +1,11 @@
 # Moving Average Factor proposed by Coulombe (2021)
 
 # Instead of conducting a global pca on the X variables, we first create lags of X.
-# Then, conduct PCA on each of these X's individually and keep the first 2 components
+# Then, conduct PCA on each of these X's individually and keep the number of components at explained at least 90% variance
 # Augment the PCs with lags of y to form the design matrix
 
-maf_transform <- function(X, P_maf = 4, q_maf = 2, scale_data = TRUE) {
+maf_transform <- function(X, P_maf = 4, scale_data = TRUE) {
+  
   T <- nrow(X)
   K <- ncol(X)
   maf_list <- vector("list", K) 
@@ -22,13 +23,21 @@ maf_transform <- function(X, P_maf = 4, q_maf = 2, scale_data = TRUE) {
     # PCA on lag matrix within-variable
     pca_j <- prcomp(lag_mat, center = FALSE, scale. = FALSE)
     
-    # Keep first q_maf PCs 
-    n_keep <- min(q_maf, ncol(pca_j$x))
-    maf_j <- pca_j$x[, 1:n_keep, drop = FALSE]
+    # Keep PCs that explain at least 90% variance
+    eig_var  <- pca_j$sdev^2
+    var_exp  <- eig_var / sum(eig_var)
+    cum_var  <- cumsum(var_exp)
+    k_needed <- which(cum_var >= 0.90)[1]
+    if (is.na(k_needed)) k_needed <- length(var_exp)
+    
+    # Safety limits: at least 1 PC, at most all available
+    k_keep <- max(1, min(k_needed, length(var_exp)))
+    
+    maf_j <- pca_j$x[, seq_len(k_keep), drop = FALSE]
     
     # Rename column
     base_name <- colnames(X)[j]
-    colnames(maf_j) <- paste0(base_name, "_MAF", seq_len(n_keep))
+    colnames(maf_j) <- paste0(base_name, "_MAF", seq_len(k_keep))
     
     maf_list[[j]] <- maf_j
   }
