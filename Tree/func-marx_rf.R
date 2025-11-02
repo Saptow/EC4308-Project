@@ -1,102 +1,123 @@
 # Moving Average Rotation of X Random Forest
 
+# We apply MARX transformation on the X variables proposed by Coulombe (2021)
+# Design matrix is lags of y, MARX lags of X. To keep model consistency across all models, we choose lags of y and lags of x be 4. 
 
-runmarxrf <- function(Y, indice, hstep, L_y = 4, P_marx = 12) {
-  stopifnot(hstep >= 1L)
+run_marxrf = function(Y, h, target_name = 'UNRATE') {
+  L_y  = 4 # lags of y to keep
+  P_marx = 4
   
-  # 0) Prep
-  Y_no_date <- Y[, -1, drop = FALSE]
-  Y_mat <- data.matrix(Y_no_date)
-  if (indice < 1 || indice > ncol(Y_mat)) {
-    stop(sprintf("indice=%d out of bounds after dropping date (1..%d)", indice, ncol(Y_mat)))
-  }
-  if (nrow(Y_mat) < (hstep + L_y + 2)) {
-    stop("Too few rows for requested hstep/L_y. Add data or reduce hstep/L_y.")
-  }
+  # 0) Drop date; split into train (1..T-1) and last row T for prediction
+  Y <- Y[, -1, drop = FALSE] # drop date column
+  Y_in  <- Y[-nrow(Y), , drop = FALSE]
+  Y_out <- Y[nrow(Y),  , drop = FALSE]
   
-  # 1) Train vs last row
-  Y_in  <- Y_mat[-nrow(Y_mat), , drop = FALSE]
-  Y_out <- Y_mat[nrow(Y_mat),  , drop = FALSE]
+  # Identify target & dummy (dummy = last col)
+  indice  <- which(colnames(Y_in) == target_name)
+  dum_idx <- ncol(Y_in)
   
-  # 2) Split y / X
-  y_train     <- Y_in[, indice, drop = FALSE]
-  X_train_raw <- Y_in[, -indice, drop = FALSE]
-  x_t         <- matrix(Y_out[, -indice, drop = FALSE], nrow = 1)
+  # Apply MARX on train X only
+  source("data_transformation/marx_transform.R")
+  X_train_raw <- as.matrix(Y_in[, setdiff(seq_len(ncol(Y_in)), c(indice, dum_idx)), drop = FALSE])
+  mx <- marx_transform(X_train_raw, n_lag = P_marx, scale_data = FALSE)
+  X_marx <- mx$mat_x_marx 
   
-  # 3) Lag depth (ensure enough for MARX and y-lags)
-  P <- max(P_marx, hstep + L_y - 1L)
+  # Align features/target for h-step learning
+  y_in <- as.numeric(Y_in[, indice, drop = TRUE])
+  T_in <- nrow(Y_in)
+  # valid times t for features: t >= max(P_marx+1, L_y+1) and t <= T_in - h
+  t_start <- max(P_marx + 1, L_y + 1)
+  t_end   <- T_in - h
+  if (t_end < t_start) stop("Window too short for chosen h/L_y/P_marx.")
+  t_idx <- t_start:t_end
   
-  # 4) MARX on X (train + last row)
-  if (!exists("marx_transform")) stop("marx_transform() not found; source it first.")
-  X_aug <- rbind(X_train_raw, x_t)
-  if (nrow(X_aug) <= P) stop("Not enough rows for MARX with lag depth P.")
-  mt <- marx_transform(X_aug, n_lag = P, scale_data = FALSE)
-  X_marx_all <- as.matrix(mt$mat_x_marx)
-  n_rows_all <- nrow(X_marx_all)
-  if (n_rows_all < 2) stop("Too few observations after MARX embedding.")
-  
-  # 5) y-lag block aligned with MARX rows
-  y_full <- c(y_train[, 1], Y_out[, indice])
-  y_emb  <- embed(y_full, P + 1L)
-  y_emb  <- tail(y_emb, n_rows_all)
-  colnames(y_emb) <- paste0("y_L", 0:P)
-  
-  # Use L_y consecutive lags starting at hstep: {hstep, ..., hstep+L_y-1}
-  lags_y  <- hstep + seq_len(L_y) - 1L
-  want_yc <- paste0("y_L", lags_y)
-  if (!all(want_yc %in% colnames(y_emb))) {
-    stop("Requested y-lags exceed available range; increase P_marx/L_y or reduce hstep.")
+  # Map to matrix rows
+  marx_rows <- t_idx - P_marx       # for X_marx
+  # y lags via embed: rows aligned so that row k is [y_t, y_{t-1},...,y_{t-L_y}]
+  if (L_y > 0) {
+    y_embed <- embed(y_in, L_y + 1)
+    y_lags  <- y_embed[, -1, drop = FALSE]        # y_{t-1}..y_{t-L_y}
+    y_rows  <- t_idx - L_y
+    y_lags_aligned <- y_lags[y_rows, , drop = FALSE]
+    colnames(y_lags_aligned) <- paste0("y_L", 1:L_y)
+  } else {
+    y_lags_aligned <- NULL
   }
   
-  # Targets y_{t+hstep} for rows 1..(n_rows_all-1)
-  y_target <- y_full[(P + 1L + hstep):(P + hstep + (n_rows_all - 1L))]
-  if (!is.numeric(y_target) || anyNA(y_target)) stop("y_target has NA/non-numeric.")
+  # Contemporaneous dummy at time t
+  dum_t <- as.numeric(Y_in[t_idx, dum_idx, drop = TRUE])
   
-  # 6) Design matrices
+  # Target is y_{t+h}
+  y_target <- y_in[t_idx + h]
+  
+  # Final training design matrix
   X_train <- cbind(
-    y_emb[1:(n_rows_all - 1L), want_yc, drop = FALSE],
-    X_marx_all[1:(n_rows_all - 1L), , drop = FALSE]
+    if (!is.null(y_lags_aligned)) as.data.frame(y_lags_aligned) else NULL,
+    as.data.frame(X_marx[marx_rows, , drop = FALSE], check.names = FALSE),
+    DUM = dum_t
   )
-  X_out <- cbind(
-    y_emb[n_rows_all, want_yc, drop = FALSE],
-    X_marx_all[n_rows_all, , drop = FALSE]
-  )
-  cn <- make.names(colnames(X_train), unique = TRUE)
-  colnames(X_train) <- cn
-  colnames(X_out)   <- cn
   
-  # 7) RF (defaults)
+  # Build X_new for forecasting y_{T_in + h} (use features at t = T_in)
+  if ((T_in - P_marx) < 1 || (T_in - P_marx) > nrow(X_marx)) {
+    stop("Cannot form X_new: window too short relative to P_marx.")
+  }
+  X_new_marx <- X_marx[T_in - P_marx, , drop = FALSE]
+  if (L_y > 0) {
+    y_lags_new <- rev(y_in[(T_in - L_y):(T_in - 1)])
+    names(y_lags_new) <- paste0("y_L", 1:L_y)
+  } else {
+    y_lags_new <- NULL
+  }
+  DUM_new <- as.numeric(Y_out[, dum_idx, drop = TRUE])
+  X_new <- as.data.frame(cbind(
+    if (!is.null(y_lags_new)) t(y_lags_new) else NULL,
+    X_new_marx,
+    DUM = DUM_new
+  ), check.names = FALSE)
+  
+  # Fit RF and predict
   set.seed(123)
-  model <- randomForest::randomForest(
-    x = as.data.frame(X_train),
-    y = as.numeric(y_target),
-    importance = TRUE
-  )
-  pred <- predict(model, as.data.frame(X_out))
+  rf   <- randomForest(x = X_train, y = y_target, importance = TRUE)
+  pred <- predict(rf, X_new)
   
-  list(model = model, pred = pred)
+  list(model = rf, pred  = pred, importance = importance(rf),X_new = X_new)
+  
 }
 
-
-marxrf.rolling.window <- function(Y, nprev, indice = 1, hstep = 1, L_y = 4, P_marx = 12) {
-  if (!exists("marx_transform")) {
-    source("data_transformation/marx_transform.R")
-  }
+# Rolling window 
+marx_rf.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE", verbose = TRUE) {
   
-  save.importance <- vector("list", nprev)
   save.pred <- matrix(NA_real_, nprev, 1)
+  save.importance <- vector("list", nprev)
+  
+  target_idx <- which(colnames(Y) == target_name)
+  if (length(target_idx) != 1) stop("target_name not found in Y.")
   
   for (i in nprev:1) {
+    # Window: (1 + nprev - i) ... (nrow(Y) - i)
     Y.window <- Y[(1 + nprev - i):(nrow(Y) - i), , drop = FALSE]
-    rf_fit <- runmarxrf(Y.window, indice, hstep, L_y = L_y, P_marx = P_marx)
+    
+    fit <- run_marxrf(Y.window, h = h, target_name = target_name)
+    
     pos <- 1 + nprev - i
-    save.pred[pos, ]       <- rf_fit$pred
-    save.importance[[pos]] <- randomForest::importance(rf_fit$model)
-    cat("iteration", pos)
+    save.pred[pos, 1]    <- as.numeric(fit$pred)
+    save.importance[[pos]] <- fit$importance
+    
+    if (verbose) cat("iteration", pos, "\n")
   }
   
-  real <- data.matrix(Y[, -1, drop = FALSE])[, indice]
+  # OOS errors against last nprev realizations
+  real <- Y[, target_idx]
   rmse <- sqrt(mean((tail(real, nprev) - save.pred[, 1])^2))
   mae  <- mean(abs(tail(real, nprev) - save.pred[, 1]))
-  list(pred = save.pred, errors = c(rmse = rmse, mae = mae), save.importance = save.importance)
+  
+  list(
+    pred = save.pred,
+    errors = c(rmse = rmse, mae = mae),
+    save.importance = save.importance
+  )
 }
+
+ 
+  
+
