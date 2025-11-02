@@ -35,7 +35,7 @@ maf_rf3 = maf_rf.rolling.window(Y, nprev, h=3, "UNRATE")
 maf_rf6 = maf_rf.rolling.window(Y, nprev, h=6, "UNRATE")
 maf_rf12 = maf_rf.rolling.window(Y, nprev, h=12, "UNRATE")
 
-
+#Use MARX-MAF random forest
 
 
 ##################################################################################
