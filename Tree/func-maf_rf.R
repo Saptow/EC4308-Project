@@ -149,7 +149,7 @@ mafrf.rolling.window <- function(Y, nprev, indice = 1, hstep = 1,
     pos <- 1 + nprev - i
     save.pred[pos, ]       <- fit$pred
     save.importance[[pos]] <- randomForest::importance(fit$model)
-    if (verbose) cat("iter", pos)
+    if (verbose) cat("iteration", pos, "\n")
   }
   
   real <- data.matrix(Y[, -1, drop = FALSE])[, indice]

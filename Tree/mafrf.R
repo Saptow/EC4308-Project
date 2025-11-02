@@ -7,7 +7,7 @@ Y = md
 Y = Y[,-59] #drop New Orders for Consumer Goods (ACOGNO) due to insufficient data
 nprev = 120
 idx = which(colnames(Y) == "UNRATE") # index for unemployment rate
-
+oosy = tail(Y[, idx], 120) 
 
 #############################################################################
 source("Tree/func-maf_rf.R")
@@ -36,7 +36,25 @@ mafrf1c <- mafrf.rolling.window(
   verbose = TRUE
 )
 
+mafrf1c$errors[1] #rsme
+mafrf1c$errors[2] #mae
+
+plot(oosy, type = 'l')
+lines(mafrf1c$pred, type = 'l', col = 'red')
+
+mafrf6c <- mafrf.rolling.window(
+  Y, nprev = nprev, indice = idx, hstep = 3,
+  p_lag_x = 4, q_maf = 2, L_y = 4,
+  scale_lags = TRUE,
+  mtry = best_params$mtry,
+  min.node.size = best_params$min.node.size,
+  sample.fraction = best_params$sample.fraction,
+  verbose = TRUE
+)
+
+
 ########################################################
+#Using library(ranger)
 source("Tree/func-maf_rf+.R")
 
 train_size <- 300

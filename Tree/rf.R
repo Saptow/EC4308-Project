@@ -13,31 +13,21 @@ Y$DUM = ifelse(Y[, 1] > cutoff, 1, 0)
 nprev = 120 #test size
 
 
-
-
-#Use random forest 1 (Going to take some time)
-source("Tree/func-rf.R")
-rf1c=rf.rolling.window(Y,nprev,idx,1)
-rf3c=rf.rolling.window(Y,nprev,idx,3)
-rf6c=rf.rolling.window(Y,nprev,idx,6)
-rf12c=rf.rolling.window(Y,nprev,idx,12)
-
-#Use random forest 2
+#Use random forest 2 (base)
 source("Tree/func-rf2.R")
 rf12c = rf2.rolling.window(Y,nprev,h=1, "UNRATE")
 rf32c = rf2.rolling.window(Y,nprev,h=3, "UNRATE")
 rf62c = rf2.rolling.window(Y,nprev,h=6, "UNRATE")
 rf122c = rf2.rolling.window(Y,nprev,h=12, "UNRATE")
 
-
+#Use MARX random forest
+source("Tree/func-marx_rf.R")
+marx_rf1 = marx_rf.rolling.window(Y, nprev, h=1, "UNRATE")
+marx_rf3 = marx_rf.rolling.window(Y, nprev, h=3, "UNRATE")
+marx_rf6 = marx_rf.rolling.window(Y, nprev, h=6, "UNRATE")
+marx_rf12 = marx_rf.rolling.window(Y, nprev, h=12, "UNRATE")
 
 #See the RMSE:
-rf.rmse1=rf1c$errors[1]
-rf.rmse1
-rf.rmse3=rf3c$errors[1]
-rf.rmse6=rf6c$errors[1]
-rf.rmse12=rf12c$errors[1]
-
 rf12c$errors[1]
 rf32c$errors[1]
 rf62c$errors[1]
@@ -103,7 +93,7 @@ library(reshape2)
 library(ggplot2)
 
 # Extract the list of importance matrices
-imp_list <- rf1c$save.importance
+imp_list <- rf12c$save.importance
 
 # (If your loop runs backward, reverse it so iteration 1 = earliest)
 imp_list <- rev(imp_list)
