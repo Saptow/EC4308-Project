@@ -58,4 +58,4 @@ __pycache__/
 venv
 .venv
 
-fbi
+fbiTree/rf_result.RData
