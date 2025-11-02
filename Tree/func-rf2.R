@@ -5,7 +5,7 @@
 
 
 # Random forest (h-step), PCA on X-only (excl. target & dummy), horizon fix,
-# features = lags of y, lags of PCs, and ONLY contemporaneous dummy.
+# features = lags of y, lags of PCs, and contemporaneous dummy.
 
 runrf = function(Y, h, target_name = "UNRATE") {
   L_y  = 4 # lags of y to keep
@@ -24,6 +24,7 @@ runrf = function(Y, h, target_name = "UNRATE") {
   y_train     <- Y_in[, indice, drop = FALSE]
   pca_cols    <- setdiff(seq_len(ncol(Y_in)), c(indice, dum_idx))
   X_train_raw <- Y_in[, pca_cols, drop = FALSE]
+  pca_vars <- colnames(X_train_raw)
   
   # 2) PCA on TRAIN ONLY (X only)
   X_train_sc <- scale(X_train_raw, center = TRUE, scale = TRUE)
@@ -83,13 +84,17 @@ runrf = function(Y, h, target_name = "UNRATE") {
   model <- randomForest::randomForest(x = X, y = y, importance = TRUE)
   pred  <- predict(model, X_out)
   
-  list(model = model, pred = pred)
+  list(model = model, pred = pred, pca = pca, n_pc = n_pc, 
+       var_exp = var_exp, pca_vars = pca_vars)
 }
 
 # Rolling window using h-step
 rf2.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE") {
   save.importance <- vector("list", nprev)
   save.pred <- matrix(NA_real_, nprev, 1)
+  save.pca      <- vector("list", nprev)  
+  save.n_pc     <- integer(nprev)         
+  save.pca_vars <- vector("list", nprev)
   
   for (i in nprev:1) {
     Y.window <- Y[(1 + nprev - i):(nrow(Y) - i), , drop = FALSE]
@@ -97,6 +102,9 @@ rf2.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE") {
     pos <- 1 + nprev - i
     save.pred[pos, ] <- rf_fit$pred
     save.importance[[pos]] <- importance(rf_fit$model)
+    save.pca[[pos]]      <- rf_fit$pca     
+    save.n_pc[pos]       <- rf_fit$n_pc     
+    save.pca_vars[[pos]] <- rf_fit$pca_vars
     cat("iteration", pos, "\n")
   }
   
@@ -105,5 +113,8 @@ rf2.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE") {
   mae  <- mean(abs(tail(real, nprev) - save.pred[, 1]))
   errors <- c(rmse = rmse, mae = mae)
   
-  list(pred = save.pred, errors = errors, save.importance = save.importance)
+  list(pred = save.pred, errors = errors, save.importance = save.importance, 
+       save.pca        = save.pca,        
+       save.n_pc       = save.n_pc,      
+       save.pca_vars   = save.pca_vars)  
 }
