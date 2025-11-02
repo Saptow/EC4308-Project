@@ -6,11 +6,16 @@ knitr::opts_chunk$set(echo = TRUE)
 # library(ARDL)
 library(dplyr)
 source('./func-adl.R')
-## For our simple ARDL benchmark, we will be using yield spread, housing permits, and bond spread
+
+# =============================================================================
+## For our simple ARDL benchmark, we will be using term spread and yield spread
+# =============================================================================
+
+# Load FRED-MD data
 load('../data/fredmd.RData')
 md=data.frame(md) # convert to data.frame
 class(md) # check that this is data.frame
-
+length(md)
 ## Select relevant variables and convert to data frame
 data = md %>%
   select(date, UNRATE, HOUST, GS10, TB3MS, BAA, AAA) %>%
@@ -25,14 +30,17 @@ data = md %>%
     ) %>%
   arrange(date)
 
+# Prepare Y and X matrices
 Y = as.matrix(data[, "UNRATE", drop=FALSE])
 X = as.matrix(data[, c("HOUST", "term_spread", "credit_spread")])
 
+# Set number of out-of-sample forecasts
 nprev=120
 
+# Define horizon windows (in months)
 horizon_windows=c(1,3,6,12)
 
-# Run using BIC 
+# Option 1: Run using BIC 
 for (h in horizon_windows){
   print(paste0("Running horizon: ", h))
   res_bic=ardl.rolling.window(
@@ -40,16 +48,19 @@ for (h in horizon_windows){
     X = X,
     nprev = nprev,
     indice = 1, # UNRATE col in Y
-    h = 1,
+    h = h,
     type = "bic",
     p_max = 4,
+    p_fixed=4,
     q_max = 4,
     use_x0 = TRUE,
-    verbose = TRUE
+    verbose = TRUE,
+    search_mode="q"
   )
   save(res_bic, file = paste0("./adl_rolling_bic_h", h, ".RData"))
 }
 
+# Option 2: Run fixed
 for (h in horizon_windows){
   print(paste0("Running horizon: ", h))
   res_fixed=ardl.rolling.window(

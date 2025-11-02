@@ -5,10 +5,15 @@
 runARDL = function(Y, X = NULL, indice = 1,
                    h = 1,
                    type = c("fixed", "bic"),
-                   p_fixed = 4, q_fixed = 0,
-                   p_max = 4, q_max = 4,
-                   use_x0 = TRUE) {
+                   p_fixed = 4, 
+                   q_fixed = 0,
+                   p_max = 4, 
+                   q_max = 4,
+                   use_x0 = TRUE,
+                   search_mode=c('pq', 'q')
+                   ) {
   type <- match.arg(type)
+  search_mode <- match.arg(search_mode)
   
   lag_start <- if (use_x0) 0 else 1
   
@@ -77,7 +82,7 @@ runARDL = function(Y, X = NULL, indice = 1,
   }
   
   
-  # fit for fixed (p, q)
+  # --- Fixed mode ---
   fit_fixed <- function(p, q) {
     dm <- make_design(p, q)
     if (nrow(dm$Z) < (p + 1)) stop("Not enough data for given p, q.")
@@ -95,20 +100,20 @@ runARDL = function(Y, X = NULL, indice = 1,
     return(fit_fixed(p_fixed, q_fixed))
   }
   
-  # --- BIC search (robust) ---
+  # --- BIC search ---
   best <- NULL
   best_bic <- Inf
   
   q_grid <- if (is.null(X)) 0 else {
     if (q_max < lag_start) integer(0) else c(0, seq.int(lag_start, q_max))
   }
-  
-  for (p in 1:p_max) {
+  p_seq <- if (search_mode == "q") p_fixed else 1:p_max
+  for (p in p_seq) {
     for (q in q_grid) {
       dm <- try(make_design(p, q), silent = TRUE)
       if (inherits(dm, "try-error")) next
       
-      # Just check minimum sample size (at least 10 obs or 2x parameters)
+      # Check min sample size
       min_obs <- max(10, 2 * (p + q * ncol(X) + 1))
       if (nrow(dm$Z) < min_obs) next
       
@@ -134,8 +139,7 @@ runARDL = function(Y, X = NULL, indice = 1,
   }
   
   if (is.null(best)) {
-    stop("BIC search failed; no candidate (p,q) had positive residual df and finite BIC. ",
-         "Try smaller p_max/q_max, larger window, or use_x0=FALSE.")
+    stop("BIC search failed.")
   }
   best
 }
@@ -152,8 +156,12 @@ ardl.rolling.window = function(Y, X = NULL,
                                p_fixed = 4, q_fixed = 0,
                                p_max = 4, q_max = 4,
                                use_x0 = TRUE,
-                               verbose = TRUE) {
+                               verbose = TRUE,
+                               search_mode=c("pq","q")
+                               ) {
+  # Parse arguments
   type <- match.arg(type)
+  search_mode <- match.arg(search_mode)
   
   nprev_eff <- nprev - (h - 1)
   if (nprev_eff <= 0) stop("nprev must be >= h")
@@ -174,9 +182,13 @@ ardl.rolling.window = function(Y, X = NULL,
     fit <- runARDL(Y.window, X.window, indice = indice,
                    h = h,
                    type = type,
-                   p_fixed = p_fixed, q_fixed = q_fixed,
-                   p_max = p_max, q_max = q_max,
-                   use_x0 = use_x0)
+                   p_fixed = p_fixed, 
+                   q_fixed = q_fixed,
+                   p_max = p_max, 
+                   q_max = q_max,
+                   use_x0 = use_x0,
+                   search_mode=search_mode
+                   )
     if (verbose) {
       cat(sprintf("iteration %d: p=%d, q=%d, BIC=%.2f\n", 
                   pos, fit$p, fit$q, fit$bic))
