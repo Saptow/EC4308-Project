@@ -5,7 +5,7 @@
 
 run_marxrf = function(Y, h, target_name = 'UNRATE') {
   L_y  = 4 # lags of y to keep
-  P_marx = 4
+  P_marx = 4 # lags of marx
   
   # 0) Drop date; split into train (1..T-1) and last row T for prediction
   Y <- Y[, -1, drop = FALSE] # drop date column
