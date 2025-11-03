@@ -110,6 +110,7 @@ maf_rf.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE", verbo
   pred_full   <- save.pred[, 1]
   
   idx <- h:nprev  
+  valid <- !is.na(pred_full)
   y_test <- y_test_full[idx]
   pred   <- pred_full[idx]
   
