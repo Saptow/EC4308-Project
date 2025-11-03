@@ -80,7 +80,6 @@ runrf = function(Y, h, target_name = "UNRATE") {
   # 4) Fit RF and predict
   X <- as.data.frame(X, check.names = FALSE)
   X_out <- X[0, , drop = FALSE]; X_out[1, ] <- as.numeric(X_new)
-  set.seed(123)
   model <- randomForest::randomForest(x = X, y = y, importance = TRUE)
   pred  <- predict(model, X_out)
   
@@ -96,22 +95,36 @@ rf2.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE") {
   save.n_pc     <- integer(nprev)         
   save.pca_vars <- vector("list", nprev)
   
-  for (i in nprev:1) {
+  set.seed(12455)
+  for (i in nprev:max(h,1)) {
     Y.window <- Y[(1 + nprev - i):(nrow(Y) - i), , drop = FALSE]
     rf_fit <- runrf(Y.window, h = h, target_name = target_name)
-    pos <- 1 + nprev - i
-    save.pred[pos, ] <- rf_fit$pred
-    save.importance[[pos]] <- importance(rf_fit$model)
-    save.pca[[pos]]      <- rf_fit$pca     
-    save.n_pc[pos]       <- rf_fit$n_pc     
-    save.pca_vars[[pos]] <- rf_fit$pca_vars
+    
+    t  <- nrow(Y) - i          
+    u  <- t + h                
+    pos <- u - (nrow(Y) - nprev)
+    
+    if (pos >= 1 && pos <= nprev) {
+      save.pred[pos, ] <- rf_fit$pred
+      save.importance[[pos]] <- importance(rf_fit$model)
+      save.pca[[pos]]      <- rf_fit$pca     
+      save.n_pc[pos]       <- rf_fit$n_pc     
+      save.pca_vars[[pos]] <- rf_fit$pca_vars
+    }
     cat("iteration", pos, "\n")
   }
   
   real <- Y[, which(colnames(Y) == target_name)]
-  rmse <- sqrt(mean((tail(real, nprev) - save.pred[, 1])^2))
-  mae  <- mean(abs(tail(real, nprev) - save.pred[, 1]))
-  errors <- c(rmse = rmse, mae = mae)
+  y_test_full <- tail(real, nprev)       # y_{T-119..T}
+  pred_full   <- save.pred[, 1]
+  
+  # keep only slots where you actually stored a forecast
+  valid <- !is.na(pred_full)
+  y_test <- y_test_full[valid]
+  pred   <- pred_full[valid]
+  rmse <- sqrt(mean((y_test - pred)^2))
+  mae  <- mean(abs(y_test - pred))
+  errors <- c(rmse = rmse, mae = mae, n_effective = sum(valid))
   
   list(pred = save.pred, errors = errors, save.importance = save.importance, 
        save.pca        = save.pca,        

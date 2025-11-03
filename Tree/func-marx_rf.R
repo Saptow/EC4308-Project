@@ -17,7 +17,6 @@ run_marxrf = function(Y, h, target_name = 'UNRATE') {
   dum_idx <- ncol(Y_in)
   
   # Apply MARX on train X only
-  source("data_transformation/marx_transform.R")
   X_train_raw <- as.matrix(Y_in[, setdiff(seq_len(ncol(Y_in)), c(indice, dum_idx)), drop = FALSE])
   mx <- marx_transform(X_train_raw, n_lag = P_marx, scale_data = FALSE)
   X_marx <- mx$mat_x_marx 
@@ -76,7 +75,6 @@ run_marxrf = function(Y, h, target_name = 'UNRATE') {
   ), check.names = FALSE)
   
   # Fit RF and predict
-  set.seed(123)
   rf   <- randomForest(x = X_train, y = y_target, importance = TRUE)
   pred <- predict(rf, X_new)
   
@@ -93,27 +91,40 @@ marx_rf.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE", verb
   target_idx <- which(colnames(Y) == target_name)
   if (length(target_idx) != 1) stop("target_name not found in Y.")
   
-  for (i in nprev:1) {
-    # Window: (1 + nprev - i) ... (nrow(Y) - i)
+  set.seed(123)
+  for (i in nprev:max(h,1)) {
     Y.window <- Y[(1 + nprev - i):(nrow(Y) - i), , drop = FALSE]
-    
     fit <- run_marxrf(Y.window, h = h, target_name = target_name)
     
-    pos <- 1 + nprev - i
-    save.pred[pos, 1]    <- as.numeric(fit$pred)
-    save.importance[[pos]] <- fit$importance
+    t  <- nrow(Y) - i          
+    u  <- t + h                
+    pos <- u - (nrow(Y) - nprev)
+    
+    
+    if (pos >= 1 && pos <= nprev) {
+      save.pred[pos, 1]    <- as.numeric(fit$pred)
+      save.importance[[pos]] <- fit$importance
+    }
     
     if (verbose) cat("iteration", pos, "\n")
   }
   
-  # OOS errors against last nprev realizations
-  real <- Y[, target_idx]
-  rmse <- sqrt(mean((tail(real, nprev) - save.pred[, 1])^2))
-  mae  <- mean(abs(tail(real, nprev) - save.pred[, 1]))
+  # OOS errors 
+  real <- Y[, which(colnames(Y) == target_name)]
+  y_test_full <- tail(real, nprev)       # y_{T-119..T}
+  pred_full   <- save.pred[, 1]
+  
+  # keep only slots where you actually stored a forecast
+  valid <- !is.na(pred_full)
+  y_test <- y_test_full[valid]
+  pred   <- pred_full[valid]
+  rmse <- sqrt(mean((y_test - pred)^2))
+  mae  <- mean(abs(y_test - pred))
+  errors <- c(rmse = rmse, mae = mae, n_effective = sum(valid))
   
   list(
     pred = save.pred,
-    errors = c(rmse = rmse, mae = mae),
+    errors = c(rmse = rmse, mae = mae, n_effective = length(idx)),
     save.importance = save.importance
   )
 }

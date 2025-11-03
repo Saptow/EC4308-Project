@@ -1,6 +1,6 @@
 # Moving Average Factor Random Forest
 # We apply MAF transformation on the X variables proposed by Coulombe (2021)
-# Design matrix is lags of y, 2 PCs for each variable using 4 lags 
+# Design matrix is lags of y, PCs for each variable using 4 lags 
 
 run_mafrf <- function(Y, h = 1, target_name = "UNRATE") {
   L_y   = 4   # number of lags of y to keep
@@ -17,7 +17,6 @@ run_mafrf <- function(Y, h = 1, target_name = "UNRATE") {
   dum_idx <- ncol(Y_in)
   
   # Apply MAF transformation on TRAIN X only
-  source("data_transformation/maf_transform.R")  
   X_train_raw <- as.matrix(Y_in[, setdiff(seq_len(ncol(Y_in)), c(indice, dum_idx)), drop = FALSE])
   maf_train <- maf_transform(X_train_raw, P_maf = P_maf, scale_data = TRUE)
   
@@ -74,7 +73,6 @@ run_mafrf <- function(Y, h = 1, target_name = "UNRATE") {
   ), check.names = FALSE)
   
   # Fit Random Forest and predict
-  set.seed(123)
   rf <- randomForest(x = X_train, y = y_target, importance = TRUE)
   pred <- predict(rf, X_new)
   
@@ -90,25 +88,37 @@ maf_rf.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE", verbo
   target_idx <- which(colnames(Y) == target_name)
   if (length(target_idx) != 1) stop("target_name not found in Y.")
   
-  for (i in nprev:1) {
+  set.seed(123)
+  for (i in nprev:max(h,1)) {
     Y.window <- Y[(1 + nprev - i):(nrow(Y) - i), , drop = FALSE]
-    
     fit <- run_mafrf(Y.window, h = h, target_name = target_name)
     
-    pos <- 1 + nprev - i
-    save.pred[pos, 1] <- as.numeric(fit$pred)
-    save.importance[[pos]] <- fit$importance
+    t  <- nrow(Y) - i          
+    u  <- t + h                
+    pos <- u - (nrow(Y) - nprev)
     
+    if (pos >= 1 && pos <= nprev) {
+      save.pred[pos, 1] <- as.numeric(fit$pred)
+      save.importance[[pos]] <- fit$importance 
+    }
+      
     if (verbose) cat("iteration", pos, "\n")
   }
   
   real <- Y[, target_idx]
-  rmse <- sqrt(mean((tail(real, nprev) - save.pred[, 1])^2))
-  mae  <- mean(abs(tail(real, nprev) - save.pred[, 1]))
+  y_test_full <- tail(real, nprev)
+  pred_full   <- save.pred[, 1]
+  
+  idx <- h:nprev  
+  y_test <- y_test_full[idx]
+  pred   <- pred_full[idx]
+  
+  rmse <- sqrt(mean((y_test - pred)^2))
+  mae  <- mean(abs(y_test - pred))
   
   list(
     pred = save.pred,
-    errors = c(rmse = rmse, mae = mae),
+    errors = c(rmse = rmse, mae = mae, n_effective = length(idx)),
     save.importance = save.importance
   )
 }
