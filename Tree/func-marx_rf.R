@@ -124,7 +124,7 @@ marx_rf.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE", verb
   
   list(
     pred = save.pred,
-    errors = c(rmse = rmse, mae = mae, n_effective = length(idx)),
+    errors = c(rmse = rmse, mae = mae, n_effective = sum(valid)),
     save.importance = save.importance
   )
 }
