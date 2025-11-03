@@ -23,6 +23,7 @@ rf122c = rf2.rolling.window(Y,nprev,h=12, "UNRATE")
 
 #Use MARX random forest
 source("Tree/func-marx_rf.R")
+source("data_transformation/marx_transform.R")
 marx_rf1 = marx_rf.rolling.window(Y, nprev, h=1, "UNRATE")
 marx_rf3 = marx_rf.rolling.window(Y, nprev, h=3, "UNRATE")
 marx_rf6 = marx_rf.rolling.window(Y, nprev, h=6, "UNRATE")
@@ -30,6 +31,7 @@ marx_rf12 = marx_rf.rolling.window(Y, nprev, h=12, "UNRATE")
 
 #Use MAF random forest
 source("Tree/func-maf_rf.R")
+source("data_transformation/maf_transform.R")  
 maf_rf1 = maf_rf.rolling.window(Y, nprev, h=1, "UNRATE")
 maf_rf3 = maf_rf.rolling.window(Y, nprev, h=3, "UNRATE")
 maf_rf6 = maf_rf.rolling.window(Y, nprev, h=6, "UNRATE")
