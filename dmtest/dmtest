@@ -2,6 +2,13 @@
 ### Diebold-Mariano (DM) tests
 #########################################################
 
+# Required libraries
+library(sandwich)   # for NeweyWest HAC estimator
+library(lmtest)     # for coeftest, regression testing tools
+library(stats)      # for lm(), acf(), ts(), plot.ts()
+library(graphics)   # for plotting functions (plot.ts)
+
+
 #####################################################
 #Set up for the tests of Random Forest vs. AR benchmark
 #####################################################
