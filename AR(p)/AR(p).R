@@ -15,11 +15,10 @@ nprev = 120 #test size
 
 source("Ar(p)/func-ar.R")
 # Test using rolling window 
-bar1c=ar.rolling.window(Y, nprev, h = 1, target_name = "UNRATE", type = "bic") #1-step AR forecast
-bar3c=ar.rolling.window(Y, nprev, h = 3, target_name = "UNRATE", type = "bic") #3-step AR forecast
-bar6c=ar.rolling.window(Y, nprev, h = 6, target_name = "UNRATE", type = "bic") #6-step AR forecast
-bar12c=ar.rolling.window(Y, nprev, h = 12, target_name = "UNRATE", type = "bic") #12-step AR forecast
-
+bar1c=ar.rolling.window(Y, nprev, h = 1, target_name = "UNRATE", type = "bic", L_max=4) #1-step AR forecast
+bar3c=ar.rolling.window(Y, nprev, h = 3, target_name = "UNRATE", type = "bic", L_max=4) #3-step AR forecast
+bar6c=ar.rolling.window(Y, nprev, h = 6, target_name = "UNRATE", type = "bic", L_max =4) #6-step AR forecast
+bar12c=ar.rolling.window(Y, nprev, h = 12, target_name = "UNRATE", type = "bic", L_max=4) #12-step AR forecast
 
 
 # Plotting
