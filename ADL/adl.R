@@ -139,86 +139,6 @@ res_marx1 <- get(load("./ADL/adl_rolling_marx_h1.RData"))
 res_marx3 <- get(load("./ADL/adl_rolling_marx_h3.RData"))
 res_marx6 <- get(load("./ADL/adl_rolling_marx_h6.RData"))   
 res_marx12 <- get(load("./ADL/adl_rolling_marx_h12.RData"))
-# ============================================
-# Helper Functions
-# ============================================
-
-get_p <- function(coef_row) {
-  y_lag_cols <- grep("^L[0-9]+\\.y$", names(coef_row), value = TRUE)
-  sum(!is.na(coef_row[y_lag_cols]))
-}
-
-get_q <- function(coef_row) {
-  x_lag_cols <- grep("^L[0-9]+\\.x[0-9]+$", names(coef_row), value = TRUE)
-  if (length(x_lag_cols) == 0) return(0)
-  n_x_vars <- length(unique(sub(".*x([0-9]+)$", "\\1", x_lag_cols)))
-  sum(!is.na(coef_row[x_lag_cols])) / n_x_vars
-}
-
-# ============================================
-# Extract p and q selections (BIC models)
-# ============================================
-
-p_bic1 <- apply(res_bic1$coef, 1, get_p)
-p_bic3 <- apply(res_bic3$coef, 1, get_p)
-p_bic6 <- apply(res_bic6$coef, 1, get_p)
-p_bic12 <- apply(res_bic12$coef, 1, get_p)
-
-q_bic1 <- apply(res_bic1$coef, 1, get_q)
-q_bic3 <- apply(res_bic3$coef, 1, get_q)
-q_bic6 <- apply(res_bic6$coef, 1, get_q)
-q_bic12 <- apply(res_bic12$coef, 1, get_q)
-
-
-
-# ============================================
-# Plot (p,q) selections over time
-# ============================================
-
-par(mfrow = c(2, 2))
-plot(p_bic1, type = "l", main = "p selection (h=1)", ylab = "p", 
-     xlab = "Iteration", ylim = c(0, 4), col = "blue", lwd = 1.5)
-abline(h = mean(p_bic1), col = "red", lty = 2)
-text(x = length(p_bic1) * 0.8, y = mean(p_bic1) + 0.3, 
-     labels = paste0("Mean: ", round(mean(p_bic1), 2)), col = "red")
-
-plot(p_bic3, type = "l", main = "p selection (h=3)", ylab = "p", 
-     xlab = "Iteration", ylim = c(0, 4), col = "blue", lwd = 1.5)
-abline(h = mean(p_bic3), col = "red", lty = 2)
-text(x = length(p_bic3) * 0.8, y = mean(p_bic3) + 0.3, 
-     labels = paste0("Mean: ", round(mean(p_bic3), 2)), col = "red")
-
-plot(p_bic6, type = "l", main = "p selection (h=6)", ylab = "p", 
-     xlab = "Iteration", ylim = c(0, 4), col = "blue", lwd = 1.5)
-abline(h = mean(p_bic6), col = "red", lty = 2)
-text(x = length(p_bic6) * 0.8, y = mean(p_bic6) + 0.3, 
-     labels = paste0("Mean: ", round(mean(p_bic6), 2)), col = "red")
-
-plot(p_bic12, type = "l", main = "p selection (h=12)", ylab = "p", 
-     xlab = "Iteration", ylim = c(0, 4), col = "blue", lwd = 1.5)
-abline(h = mean(p_bic12), col = "red", lty = 2)
-text(x = length(p_bic12) * 0.8, y = mean(p_bic12) + 0.3, 
-     labels = paste0("Mean: ", round(mean(p_bic12), 2)), col = "red")
-par(mfrow = c(1, 1))
-
-# Same for q
-par(mfrow = c(2, 2))
-plot(q_bic1, type = "l", main = "q selection (h=1)", ylab = "q", 
-     xlab = "Iteration", ylim = c(0, 4), col = "darkgreen", lwd = 1.5)
-abline(h = mean(q_bic1), col = "red", lty = 2)
-
-plot(q_bic3, type = "l", main = "q selection (h=3)", ylab = "q", 
-     xlab = "Iteration", ylim = c(0, 4), col = "darkgreen", lwd = 1.5)
-abline(h = mean(q_bic3), col = "red", lty = 2)
-
-plot(q_bic6, type = "l", main = "q selection (h=6)", ylab = "q", 
-     xlab = "Iteration", ylim = c(0, 4), col = "darkgreen", lwd = 1.5)
-abline(h = mean(q_bic6), col = "red", lty = 2)
-
-plot(q_bic12, type = "l", main = "q selection (h=12)", ylab = "q", 
-     xlab = "Iteration", ylim = c(0, 4), col = "darkgreen", lwd = 1.5)
-abline(h = mean(q_bic12), col = "red", lty = 2)
-par(mfrow = c(1, 1))
 
 # ============================================
 # Compare forecasts: BIC vs Fixed
@@ -361,9 +281,8 @@ make_perf_table <- function() {
       obj_name <- sprintf("res_%s%d", tag, h)  # e.g., res_bic3, res_maf6, etc.
 
       res <- get0(obj_name, inherits = TRUE, ifnotfound = NULL)
-      if (is.null(res)) next  # skip if you haven't run that model/horizon
 
-      # errors = c(rmse, mae) per your runARDL/rolling code
+     # compute errors to evaluate
       rmse <- as.numeric(res$errors[1])
       mae  <- as.numeric(res$errors[2])
 
