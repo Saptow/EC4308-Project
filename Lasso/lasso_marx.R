@@ -1,5 +1,5 @@
 #setwd()
-load("data/fredmd.RData") 
+load("data/fredmd_cleaned.RData") 
 source("data_transformation/marx_transform.R") 
 
 library(glmnet)
@@ -8,11 +8,6 @@ library(sandwich) #library to estimate variance for DM test regression using New
 library(hdm)
 
 Y = md
-Y = Y[,-59] #drop New Orders for Consumer Goods (ACOGNO) due to insufficient data
-
-#Create dummy variable after Nov 2010 to handle structural break
-cutoff = as.Date("2010-11-01")
-Y$DUM = ifelse(Y[, 1] > cutoff, 1, 0)
 nprev = 120 #test size
 
 ########################################
@@ -23,13 +18,13 @@ run_marxlasso <- function(Y, h, target_name = 'UNRATE',
                           alpha = 1, IC = "bic") {
   
   # 0) Drop date; split into train (1..T-1) and last row T for prediction
-  Y <- Y[, -1, drop = FALSE]
+  Y <- subset(Y, select = -date)
   Y_in  <- Y[-nrow(Y), , drop = FALSE]
   Y_out <- Y[nrow(Y),  , drop = FALSE]
   
   # Identify target & dummy (dummy = last col)
   idx_y   <- which(colnames(Y_in) == target_name)
-  idx_dum <- ncol(Y_in)
+  dum_idx <- which(colnames(Y_in) == "aft_break") # dummy var index
   if (length(idx_y) != 1) stop("target_name not found in Y.")
   
   # 1) MARX on TRAIN X only (exclude target & dummy)

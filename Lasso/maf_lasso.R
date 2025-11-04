@@ -8,7 +8,6 @@ library(sandwich) #library to estimate variance for DM test regression using New
 library(hdm)
 
 Y = md
-Y = Y[,-59] #drop New Orders for Consumer Goods (ACOGNO) due to insufficient data
 nprev = 120 #test size
 
 ########################################
@@ -20,13 +19,13 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
                          alpha = 1, IC = "bic") {
   
   # Drop date; split train (1..T-1) and last row T for prediction
-  Y <- Y[, -1, drop = FALSE]
+  Y <- subset(Y, select = -date)
   Y_in  <- Y[-nrow(Y), , drop = FALSE]
   Y_out <- Y[nrow(Y),  , drop = FALSE]
   
   # Identify target & dummy (dummy = last column)
   idx_y   <- which(colnames(Y_in) == target_name)
-  idx_dum <- ncol(Y_in)
+  dum_idx <- which(colnames(Y_in) == "aft_break") # dummy var index
   if (length(idx_y) != 1) stop("target_name not found in Y.")
   
   # 1) MAF on TRAIN X only (exclude target & dummy)
@@ -201,5 +200,10 @@ alpha=1 #set alpha=1 for LASSO
 #Run forecasts for MAF-LASSO (BIC)
 maf_lasso1c=maf_lasso.rolling.window(Y,nprev,h=1,target_name = "UNRATE",
                                        L_y = 4, P_maf = 4, alpha,IC="bic")
-
+maf_lasso3c=maf_lasso.rolling.window(Y,nprev,h=3,target_name = "UNRATE",
+                                     L_y = 4, P_maf = 4, alpha,IC="bic")
+maf_lasso6c=maf_lasso.rolling.window(Y,nprev,h=6,target_name = "UNRATE",
+                                     L_y = 4, P_maf = 4, alpha,IC="bic")
+maf_lasso12c=maf_lasso.rolling.window(Y,nprev,h=12,target_name = "UNRATE",
+                                     L_y = 4, P_maf = 4, alpha,IC="bic")
 
