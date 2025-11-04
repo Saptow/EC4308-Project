@@ -1,6 +1,6 @@
 rm(list=ls())
 #setwd()
-load("data/fredmd.RData") 
+load("data/fredmd_cleaned.RData") 
 
 library(glmnet)
 library(HDeconometrics)
@@ -8,13 +8,7 @@ library(sandwich) #library to estimate variance for DM test regression using New
 library(hdm)
 
 Y = md
-Y = Y[,-59] #drop New Orders for Consumer Goods (ACOGNO) due to insufficient data
-
-#Create dummy variable after Nov 2010 to handle structural break
-cutoff = as.Date("2010-11-01")
-Y$DUM = ifelse(Y[, 1] > cutoff, 1, 0)
-nprev = 120 #test size
-
+nprev=120
 ######################################
 #LASSO AND ROLLING WINDOW FUNCTION
 ######################################
@@ -23,13 +17,13 @@ runlasso <- function(Y, h = 1, target_name = "UNRATE", alpha = 1, IC = "bic") {
   L_pc <- L_y
   
   # 0) Drop date; split into train (1..T-1) and last row T
-  Y <- Y[, -1, drop = FALSE]
+  Y <- subset(Y, select = -date)
   Y_in  <- Y[-nrow(Y), , drop = FALSE]
   Y_out <- Y[nrow(Y),  , drop = FALSE]
   
   # Identify target & dummy (dummy = last col)
   indice  <- which(colnames(Y_in) == target_name)
-  dum_idx <- ncol(Y_in)
+  dum_idx <- which(colnames(Y_in) == "aft_break") # dummy var index
   
   # 1) y and X for PCA (exclude target + dummy)
   y_train     <- Y_in[, indice, drop = FALSE]
