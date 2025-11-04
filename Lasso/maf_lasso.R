@@ -29,7 +29,7 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
   if (length(idx_y) != 1) stop("target_name not found in Y.")
   
   # 1) MAF on TRAIN X only (exclude target & dummy)
-  X_train_raw <- as.matrix(Y_in[, setdiff(seq_len(ncol(Y_in)), c(idx_y, idx_dum)), drop = FALSE])
+  X_train_raw <- as.matrix(Y_in[, setdiff(seq_len(ncol(Y_in)), c(idx_y, dum_idx)), drop = FALSE])
   maf_train <- maf_transform(X_train_raw, P_maf = P_maf, scale_data = TRUE)  # expect (T_in - P_maf) rows
   
   # 2) Horizon-consistent alignment
@@ -53,7 +53,7 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
     y_lags_aligned <- NULL
   }
   
-  dum_t    <- as.numeric(Y_in[t_idx, idx_dum, drop = TRUE])  # contemporaneous dummy
+  dum_t    <- as.numeric(Y_in[t_idx, dum_idx, drop = TRUE])  # contemporaneous dummy
   y_target <- y_in[t_idx + h]                                # target y_{t+h}
   
   # 3) Assemble training design (no NA imputation; we will drop incomplete rows)
@@ -82,7 +82,7 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
   } else {
     y_lags_new <- NULL
   }
-  DUM_new <- as.numeric(Y_out[, idx_dum, drop = TRUE])
+  DUM_new <- as.numeric(Y_out[, dum_idx, drop = TRUE])
   
   X_new_df <- as.data.frame(cbind(
     if (!is.null(y_lags_new)) t(y_lags_new) else NULL,
@@ -95,7 +95,7 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
   }
   
   # 5) Standardize NON-dummy features  
-  dum_name <- colnames(Y_in)[idx_dum]
+  dum_name <- colnames(Y_in)[dum_idx]
   non_dummy_cols <- setdiff(colnames(X_train_df), dum_name)
   
   X_non_train <- as.matrix(X_train_df[, non_dummy_cols, drop = FALSE])

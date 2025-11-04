@@ -28,7 +28,7 @@ run_marxlasso <- function(Y, h, target_name = 'UNRATE',
   if (length(idx_y) != 1) stop("target_name not found in Y.")
   
   # 1) MARX on TRAIN X only (exclude target & dummy)
-  X_train_raw <- as.matrix(Y_in[, setdiff(seq_len(ncol(Y_in)), c(idx_y, idx_dum)), drop = FALSE])
+  X_train_raw <- as.matrix(Y_in[, setdiff(seq_len(ncol(Y_in)), c(idx_y, dum_idx)), drop = FALSE])
   mx <- marx_transform(X_train_raw, n_lag = P_marx, scale_data = FALSE)
   X_marx <- mx$mat_x_marx   # should have T_in - P_marx rows if coded à la Coulombe
   
@@ -57,7 +57,7 @@ run_marxlasso <- function(Y, h, target_name = 'UNRATE',
   }
   
   # contemporaneous dummy and target
-  dum_t    <- as.numeric(Y_in[t_idx, idx_dum, drop = TRUE])
+  dum_t    <- as.numeric(Y_in[t_idx, dum_idx, drop = TRUE])
   y_target <- y_in[t_idx + h]
   
   # 3) Assemble training design (no NA imputation)
@@ -87,7 +87,7 @@ run_marxlasso <- function(Y, h, target_name = 'UNRATE',
   } else {
     y_lags_new <- NULL
   }
-  DUM_new <- as.numeric(Y_out[, idx_dum, drop = TRUE])
+  DUM_new <- as.numeric(Y_out[, dum_idx, drop = TRUE])
   
   X_new_df <- as.data.frame(cbind(
     if (!is.null(y_lags_new)) t(y_lags_new) else NULL,
