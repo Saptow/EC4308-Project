@@ -3,22 +3,22 @@
 knitr::opts_chunk$set(echo = TRUE)
 
 ## Load library
-# library(ARDL)
+# Assume working directory is at root of repo
 library(dplyr)
-source('./func-adl.R')
+source('./ADL/func-adl.R')
 
 # =============================================================================
 ## For our simple ARDL benchmark, we will be using term spread and yield spread
 # =============================================================================
 
 # Load FRED-MD data
-load('../data/fredmd.RData')
+load('./data/fredmd_cleaned.RData')
 md=data.frame(md) # convert to data.frame
 class(md) # check that this is data.frame
-length(md)
+
 ## Select relevant variables and convert to data frame
 data = md %>%
-  select(date, UNRATE, HOUST, GS10, TB3MS, BAA, AAA) %>%
+  select(date, UNRATE, HOUST, GS10, TB3MS, BAA, AAA, aft_break) %>%
   na.omit() %>%
   mutate(
     date=date,
@@ -26,13 +26,14 @@ data = md %>%
     HOUST=HOUST,
     term_spread=GS10 - TB3MS,
     credit_spread=BAA - AAA, 
+    aft_break=aft_break,
     .keep="none"
     ) %>%
   arrange(date)
 
 # Prepare Y and X matrices
 Y = as.matrix(data[, "UNRATE", drop=FALSE])
-X = as.matrix(data[, c("HOUST", "term_spread", "credit_spread")])
+X = as.matrix(data[, c("HOUST", "term_spread", "credit_spread", "aft_break")])
 
 # Set number of out-of-sample forecasts
 nprev=120
@@ -57,7 +58,7 @@ for (h in horizon_windows){
     verbose = TRUE,
     search_mode="q"
   )
-  save(res_bic, file = paste0("./adl_rolling_bic_h", h, ".RData"))
+  save(res_bic, file = paste0("./ADL/adl_rolling_bic_h", h, ".RData"))
 }
 
 # Option 2: Run fixed
@@ -75,20 +76,59 @@ for (h in horizon_windows){
     use_x0 = TRUE,
     verbose = TRUE
   )
-  save(res_fixed, file = paste0("./adl_rolling_fixed_h", h, ".RData"))
+  save(res_fixed, file = paste0("./ADL/adl_rolling_fixed_h", h, ".RData"))
 }
 
+# Option 3: Run using MAF
+for (h in horizon_windows){
+  print(paste0("Running horizon: ", h))
+  res_maf=ardl.rolling.window(
+    Y = Y,
+    X = X,
+    nprev = nprev,
+    indice = 1, # UNRATE col in Y
+    h = h,
+    type = "maf",
+    p_max = 4,
+    p_fixed=4,
+    q_max = 4,
+    use_x0 = TRUE,
+    verbose = TRUE,
+    P_maf = 4
+  )
+  save(res_maf, file = paste0("./ADL/adl_rolling_maf_h", h, ".RData"))
+}
+
+# Option 4: Run using MARX
+for (h in horizon_windows){
+     print(paste0("Running horizon: ", h))
+     res_marx=ardl.rolling.window(
+     Y = Y,
+     X = X,
+     nprev = nprev,
+     indice = 1, # UNRATE col in Y
+     h = h,
+     type = "marx",
+     p_max = 4,
+     p_fixed=4,
+     q_max = 4,
+     use_x0 = TRUE,
+     verbose = TRUE,
+     marx_q = 4
+     )
+     save(res_marx, file = paste0("./ADL/adl_rolling_marx_h", h, ".RData"))
+     }
 
 # Load all results
-res_bic1 <- get(load("./adl_rolling_bic_h1.RData"))
-res_bic3 <- get(load("./adl_rolling_bic_h3.RData"))
-res_bic6 <- get(load("./adl_rolling_bic_h6.RData"))
-res_bic12 <- get(load("./adl_rolling_bic_h12.RData"))
+res_bic1 <- get(load("./ADL/adl_rolling_bic_h1.RData"))
+res_bic3 <- get(load("./ADL/adl_rolling_bic_h3.RData"))
+res_bic6 <- get(load("./ADL/adl_rolling_bic_h6.RData"))
+res_bic12 <- get(load("./ADL/adl_rolling_bic_h12.RData"))
 
-res_fixed1 <- get(load("./adl_rolling_fixed_h1.RData"))
-res_fixed3 <- get(load("./adl_rolling_fixed_h3.RData"))
-res_fixed6 <- get(load("./adl_rolling_fixed_h6.RData"))
-res_fixed12 <- get(load("./adl_rolling_fixed_h12.RData"))
+res_fixed1 <- get(load("./ADL/adl_rolling_fixed_h1.RData"))
+res_fixed3 <- get(load("./ADL/adl_rolling_fixed_h3.RData"))
+res_fixed6 <- get(load("./ADL/adl_rolling_fixed_h6.RData"))
+res_fixed12 <- get(load("./ADL/adl_rolling_fixed_h12.RData"))
 
 # ============================================
 # Helper Functions
@@ -179,7 +219,7 @@ nprev_eff <- length(res_bic1$pred)
 oosy <- tail(real, nprev_eff)
 
 # h=1
-par(mfrow = c(2, 2))
+options(repr.plot.width = 12, repr.plot.height = 6)
 bench1.ts <- ts(cbind(res_bic1$pred, res_fixed1$pred, oosy), 
                 start = c(2010, 1), end = c(2019, 12), freq = 12)
 colnames(bench1.ts) <- c("ARDL-BIC", "ARDL-Fixed", "True")

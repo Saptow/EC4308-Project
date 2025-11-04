@@ -1,224 +1,269 @@
+#============================================
+# Helper functions 
+#============================================
+# pad feature matrix to match target length by adding NA rows on top
+pad_top_na <- function(M, target_n) {
+  if (is.null(M)) return(M)
+  n <- nrow(M)
+  if (n >= target_n) return(M)
+  pad <- matrix(NA_real_, nrow = target_n - n, ncol = ncol(M))
+  colnames(pad) <- colnames(M)
+  rbind(pad, M)
+}
+
+make_design <- function(y_raw, X, p, q, h, dummy_name = "aft_break") {
+  # y-lags (do not overwrite raw series)
+  y_lags <- if (p > 0) {
+    yl <- embed(y_raw, p + 1)
+    colnames(yl) <- c("L0.y", paste0("L", 1:p, ".y"))
+    rbind(matrix(NA_real_, nrow = p, ncol = ncol(yl)), yl)
+  } else {
+    matrix(, nrow = length(y_raw), ncol = 0)
+  }
+  
+  # direct h-step target
+  y_lead <- c(y_raw[(1 + h):length(y_raw)], rep(NA_real_, h))
+  
+  # X block
+  if (!is.null(X)) {
+    if (q > 0) {
+      stopifnot(dummy_name %in% colnames(X))
+      X_wo <- X[, setdiff(colnames(X), dummy_name), drop = FALSE]
+      tmp  <- embed(as.matrix(X_wo), q + 1)  # (q+1)*K
+      K    <- ncol(X_wo)
+      laglabs <- paste0("L", 0:q)
+      base <- rep(colnames(X_wo), each = q + 1)
+      lags <- rep(laglabs, times = K)
+      colnames(tmp) <- paste0(base, "_", lags)
+      x_lags <- rbind(matrix(NA_real_, nrow = q, ncol = ncol(tmp)), tmp)
+      X_block <- cbind(setNames(X[, dummy_name, drop = FALSE], dummy_name), x_lags)
+    } else {
+      # prebuilt features (MAF/MARX) – assume already aligned/padded
+      X_block <- as.matrix(X)
+    }
+  } else {
+    X_block <- matrix(, nrow = length(y_raw), ncol = 0)
+  }
+  
+  Z <- as.data.frame(cbind(y_lead = y_lead, y_lags, X_block))
+  Z <- Z[stats::complete.cases(Z), , drop = FALSE]
+  list(Z = Z)
+}
+
+fit_fixed <- function(y, X, p, q, h) {
+  dm <- make_design(y, X, p, q, h)
+  if (nrow(dm$Z) < (p + 1)) stop("Not enough data for given p, q.")
+  model <- stats::lm(y_lead ~ . , data = dm$Z)
+  # last predictor row (drop target)
+  last_pred <- as.data.frame(dm$Z[nrow(dm$Z), setdiff(colnames(dm$Z), "y_lead"), drop = FALSE])
+  pred  <- as.numeric(stats::predict(model, newdata = last_pred))
+  list(model = model, pred = pred, coef = stats::coef(model),
+       p = p, q = q, bic = stats::BIC(model))
+}
 
 # ============================================
 # ADL direct h-step forecast (rolling window)
 # ============================================
-runARDL = function(Y, X = NULL, indice = 1,
-                   h = 1,
-                   type = c("fixed", "bic"),
-                   p_fixed = 4, 
-                   q_fixed = 0,
-                   p_max = 4, 
-                   q_max = 4,
-                   use_x0 = TRUE,
-                   search_mode=c('pq', 'q')
-                   ) {
+runARDL <- function(Y, X = NULL, indice = 1,
+                    h = 1,
+                    type = c("bic","fixed","maf","marx"),
+                    p_max = 4,
+                    p_fixed = 4,
+                    q_max = 4,
+                    q_fixed = 4,
+                    use_x0 = TRUE,
+                    search_mode = c("pq","q"),
+                    P_maf = 4,
+                    marx_q = 4) {
+  
   type <- match.arg(type)
   search_mode <- match.arg(search_mode)
-  
   lag_start <- if (use_x0) 0 else 1
   
-  # data validation
   y <- as.numeric(Y[, indice])
   if (!is.null(X)) X <- as.matrix(X)
   
-  shift_vec <- function(v, k) {
-    if (k > 0)  c(rep(NA_real_, k), head(v, -k))
-    else if (k < 0) c(tail(v, k), rep(NA_real_, -k))  # k negative -> lead
-    else v
+  if (type == "fixed") {
+    return(fit_fixed(y, X, p_fixed, q_fixed, h))
+  }
+
+  if (type == "maf") {
+    source("./data_transformation/maf_transform.R")
+    dum <- X[, "aft_break", drop = FALSE]
+    X_wo <- X[, colnames(X) != "aft_break", drop = FALSE]
+    X_maf <- maf_transform(X_wo, P_maf = P_maf, scale_data = FALSE)
+    # align dummy and pad to y length
+    dum_aligned <- dum[-seq_len(P_maf - 1), , drop = FALSE]
+    X_maf <- cbind(aft_break = dum_aligned[,1], X_maf)
+    X_maf <- pad_top_na(X_maf, length(y))
+    # # Final checks for X_maf and y
+    # cat(sprintf("MAF X rows: %d, Y length: %d\n",
+    #              nrow(X_maf), length(y)))
+    # if (nrow(X_maf) != length(y)) {
+    #   stop(sprintf("X and Y row mismatch after padding: %d vs %d",
+    #                nrow(X_maf), length(y)))
+    # }
+    return(fit_fixed(y, X_maf, p = 0, q = 0, h = h))
   }
   
-  make_design <- function(p, q) {
-    # y lags
-    yl <- if (p > 0) {
-      mats <- lapply(1:p, function(L) {
-        v <- matrix(shift_vec(y, L), ncol = 1)
-        colnames(v) <- paste0("L", L, ".y")
-        v
-      })
-      do.call(cbind, mats)
-    } else NULL
+  if (type == "marx") {
+    source("./data_transformation/marx_transform.R")
+    dum <- X[, "aft_break", drop = FALSE]
+    X_wo <- X[, colnames(X) != "aft_break", drop = FALSE]
+    mx <- marx_transform(X_wo, n_lag = marx_q, scale_data = FALSE)
+    X_marx <- if (is.list(mx)) mx$mat_x_marx else mx
+    dum_aligned <- dum[-seq_len(marx_q - 1), , drop = FALSE]
+    X_marx <- cbind(aft_break = dum_aligned[,1], X_marx)
+    X_marx <- pad_top_na(X_marx, length(y))
+    return(fit_fixed(y, X_marx, p = 0, q = 0, h = h))
+  }
+  
+  if (type == "bic") {
+    best <- NULL; best_bic <- Inf
+    q_grid <- if (is.null(X)) 0 else {
+      if (q_max < lag_start) integer(0) else c(0, seq.int(lag_start, q_max))
+    }
+    p_seq <- if (search_mode == "q") p_fixed else 1:p_max
+    Kx <- if (is.null(X)) 0 else ncol(X)
     
-    # X lags 
-    if (!is.null(X) && q > 0) {
-      xlag_list <- list()
-      for (j in seq_len(ncol(X))) {
-        xj <- as.numeric(X[, j])
-        for (L in lag_start:q) {
-          v <- matrix(shift_vec(xj, L), ncol = 1)
-          colnames(v) <- paste0("L", L, ".x", j)
-          xlag_list[[length(xlag_list) + 1]] <- v
+    for (p in p_seq) {
+      for (q in q_grid) {
+        dm <- try(make_design(y, X, p, q, h), silent = TRUE)
+        if (inherits(dm, "try-error")) next
+        
+        # crude min sample size rule
+        min_obs <- max(10, 2 * (p + q * Kx + 1))
+        if (nrow(dm$Z) < min_obs) next
+        
+        model <- try(stats::lm(y_lead ~ . , data = dm$Z), silent = TRUE)
+        if (inherits(model, "try-error")) next
+        
+        bval <- suppressWarnings(stats::BIC(model))
+        if (!is.finite(bval)) next
+        
+        if (bval < best_bic) {
+          last_pred <- as.data.frame(dm$Z[nrow(dm$Z),
+                                          setdiff(colnames(dm$Z), "y_lead"), drop = FALSE])
+          pred <- as.numeric(stats::predict(model, newdata = last_pred))
+          best <- list(model = model, pred = pred, coef = stats::coef(model),
+                       p = p, q = q, bic = bval)
+          best_bic <- bval
         }
       }
-      Xlags <- if (length(xlag_list)) do.call(cbind, xlag_list) else NULL
-    } else {
-      Xlags <- NULL
     }
-    
-    y_lead <- shift_vec(y, -h)
-    
-    Z <- as.data.frame(cbind("y_lead" = y_lead, yl, Xlags))
-    Z <- Z[stats::complete.cases(Z), , drop = FALSE]
-    
-    # build Xout
-    get_last_non_na <- function(v) { vv <- v[!is.na(v)]; if (!length(vv)) NA_real_ else tail(vv, 1) }
-    Xout <- c(1)
-    if (p > 0) for (L in 1:p) Xout <- c(Xout, get_last_non_na(shift_vec(y, L)))
-    if (!is.null(X) && q > 0) {
-      for (j in seq_len(ncol(X))) {
-        xj <- as.numeric(X[, j])
-        for (L in lag_start:q) Xout <- c(Xout, get_last_non_na(shift_vec(xj, L)))
-      }
-    }
-    varnames <- c("(Intercept)")
-    if (p > 0) for (L in 1:p) varnames <- c(varnames, paste0("L", L, ".y"))
-    if (!is.null(X) && q >= 0) {
-      for (j in seq_len(ncol(X))) {
-        for (L in lag_start:q) varnames <- c(varnames, paste0("L", L, ".x", j))
-      }
-    }
-    names(Xout) <- varnames
-    
-    list(Z = Z, Xout = matrix(Xout, nrow = 1))
+    if (is.null(best)) stop("BIC search failed.")
+    return(best)
   }
-  
-  
-  # --- Fixed mode ---
-  fit_fixed <- function(p, q) {
-    dm <- make_design(p, q)
-    if (nrow(dm$Z) < (p + 1)) stop("Not enough data for given p, q.")
-    model <- stats::lm(y_lead ~ . , data = dm$Z)
-    coef  <- stats::coef(model)
-    mm_cols <- colnames(stats::model.matrix(model))
-    xout_named <- stats::setNames(as.numeric(dm$Xout), mm_cols)  # same order & names
-    newdata <- as.data.frame(as.list(xout_named[-1]))            # drop intercept
-    pred  <- as.numeric(stats::predict(model, newdata = newdata))
-    list(model = model, pred = pred, coef = coef, p = p, q = q,
-         bic = stats::BIC(model))  # optional: include BIC for consistency
-  }
-  
-  if (type == "fixed") {
-    return(fit_fixed(p_fixed, q_fixed))
-  }
-  
-  # --- BIC search ---
-  best <- NULL
-  best_bic <- Inf
-  
-  q_grid <- if (is.null(X)) 0 else {
-    if (q_max < lag_start) integer(0) else c(0, seq.int(lag_start, q_max))
-  }
-  p_seq <- if (search_mode == "q") p_fixed else 1:p_max
-  for (p in p_seq) {
-    for (q in q_grid) {
-      dm <- try(make_design(p, q), silent = TRUE)
-      if (inherits(dm, "try-error")) next
-      
-      # Check min sample size
-      min_obs <- max(10, 2 * (p + q * ncol(X) + 1))
-      if (nrow(dm$Z) < min_obs) next
-      
-      model <- try(stats::lm(y_lead ~ . , data = dm$Z), silent = TRUE)
-      if (inherits(model, "try-error")) next
-      
-      bval <- suppressWarnings(stats::BIC(model))
-      if (!is.finite(bval)) next
-      
-      if (bval < best_bic) {
-        best_bic <- bval
-        
-        coef  <- stats::coef(model)
-        mm_cols <- colnames(stats::model.matrix(model))
-        xout_named <- stats::setNames(as.numeric(dm$Xout), mm_cols)
-        newdata <- as.data.frame(as.list(xout_named[-1]))
-        pred  <- as.numeric(stats::predict(model, newdata = newdata))
-        
-        best <- list(model = model, pred = pred, coef = coef,
-                     p = p, q = q, bic = bval)
-      }
-    }
-  }
-  
-  if (is.null(best)) {
-    stop("BIC search failed.")
-  }
-  best
 }
 
-## ------------------------------------------------
-# Rolling Window Helper Function 
-## ------------------------------------------------
-
-ardl.rolling.window = function(Y, X = NULL,
-                               nprev,
-                               indice = 1,
-                               h = 1,
-                               type = c("fixed", "bic"),
-                               p_fixed = 4, q_fixed = 0,
-                               p_max = 4, q_max = 4,
-                               use_x0 = TRUE,
-                               verbose = TRUE,
-                               search_mode=c("pq","q")
-                               ) {
-  # Parse arguments
+# Rolling Window
+ardl.rolling.window <- function(Y, X = NULL,
+                                nprev,
+                                indice = 1,
+                                h = 1,
+                                type = c("fixed", "bic", "maf", "marx"),
+                                p_fixed = 4, q_fixed = 0,
+                                p_max = 4, q_max = 4,
+                                use_x0 = TRUE,
+                                verbose = TRUE,
+                                search_mode = c("pq","q"),
+                                P_maf = 4,
+                                marx_q = 4) {
+  # Parse args
   type <- match.arg(type)
   search_mode <- match.arg(search_mode)
-  
+
+  # Effective number of rolling evaluations for direct h-step
   nprev_eff <- nprev - (h - 1)
   if (nprev_eff <= 0) stop("nprev must be >= h")
-  
+
+  N <- nrow(Y)
+
+  # Storage
   coef_list <- vector("list", nprev_eff)
   pred_vec  <- rep(NA_real_, nprev_eff)
-  
-  p_used  <- integer(nprev_eff)
-  q_used  <- integer(nprev_eff)
-  bic_used <- rep(NA_real_, nprev_eff)
-  
-  N <- nrow(Y)
+  p_used    <- rep(NA_integer_, nprev_eff)
+  q_used    <- rep(NA_integer_, nprev_eff)
+  bic_used  <- rep(NA_real_,     nprev_eff)
+
   pos <- 1
   for (i in seq(nprev, h, by = -1)) {
-    Y.window <- Y[(1 + nprev - i):(N - i), , drop = FALSE]
-    X.window <- if (is.null(X)) NULL else X[(1 + nprev - i):(N - i), , drop = FALSE]
+    # Rolling window: expand-to-last with shrinking holdout
+    # Y[(1 + nprev - i) : (N - i)]
+    y_idx_start <- 1 + nprev - i
+    y_idx_end   <- N - i
+    Y.window <- Y[y_idx_start:y_idx_end, , drop = FALSE]
+    X.window <- if (is.null(X)) NULL else X[y_idx_start:y_idx_end, , drop = FALSE]
+
+    # # Check X 
+    # if (!is.null(X.window)) {
+    #   cat(sprintf("Window %d:%d - Y rows: %d, X rows: %d\n",
+    #               y_idx_start, y_idx_end,
+    #               nrow(Y.window), nrow(X.window)))
+    #   if (nrow(X.window) != nrow(Y.window)) {
+    #     stop(sprintf("X and Y row mismatch in window: %d vs %d",
+    #                  nrow(X.window), nrow(Y.window)))
+    #   }
+    # }
     
-    fit <- runARDL(Y.window, X.window, indice = indice,
-                   h = h,
-                   type = type,
-                   p_fixed = p_fixed, 
-                   q_fixed = q_fixed,
-                   p_max = p_max, 
-                   q_max = q_max,
-                   use_x0 = use_x0,
-                   search_mode=search_mode
-                   )
-    if (verbose) {
-      cat(sprintf("iteration %d: p=%d, q=%d, BIC=%.2f\n", 
-                  pos, fit$p, fit$q, fit$bic))
+    # Fit ADL model
+    fit <- try(
+      runARDL(
+        Y.window, X.window, indice = indice,
+        h = h,
+        type = type,
+        p_fixed = p_fixed, q_fixed = q_fixed,
+        p_max = p_max,   q_max = q_max,
+        use_x0 = use_x0,
+        search_mode = search_mode,
+        P_maf = P_maf,
+        marx_q = marx_q
+      ),
+      silent = TRUE
+    )
+
+    if (inherits(fit, "try-error")) {
+      if (verbose) {
+        cat(sprintf("iteration %d: (window %d:%d) fit failed: %s\n",
+                    pos, y_idx_start, y_idx_end, as.character(fit)))
+      }
+      # Leave NAs for this iteration and continue
+    } else {
+      if (verbose) {
+        cat(sprintf("iteration %d: p=%s, q=%s, BIC=%s\n",
+                    pos,
+                    if (!is.null(fit$p)) fit$p else NA_integer_,
+                    if (!is.null(fit$q)) fit$q else NA_integer_,
+                    if (!is.null(fit$bic) && is.finite(fit$bic)) sprintf("%.2f", fit$bic) else "NA"))
+      }
+      coef_list[[pos]] <- fit$coef
+      pred_vec[pos]    <- fit$pred
+      p_used[pos]      <- if (!is.null(fit$p)) fit$p else NA_integer_
+      q_used[pos]      <- if (!is.null(fit$q)) fit$q else NA_integer_
+      bic_used[pos]    <- if (!is.null(fit$bic) && is.finite(fit$bic)) fit$bic else NA_real_
     }
-    
-    coef_list[[pos]] <- fit$coef
-    pred_vec[pos]    <- fit$pred
-    
-    p_used[pos] <- fit$p
-    q_used[pos] <- fit$q
-    bic_used[pos] <- if (!is.null(fit$bic)) fit$bic else NA_real_
-    
+
     pos <- pos + 1
   }
-  
+
+  # Targets to evaluate against: last nprev_eff observations of chosen series
   real   <- as.numeric(Y[, indice])
   y_true <- tail(real, nprev_eff)
-  
-  rmse <- sqrt(mean((y_true - pred_vec)^2))
-  mae  <- mean(abs(y_true - pred_vec))
+
+  # Errors (ignore NAs if any)
+  rmse <- sqrt(mean((y_true - pred_vec)^2, na.rm = TRUE))
+  mae  <- mean(abs(y_true - pred_vec), na.rm = TRUE)
   errors <- c(rmse = rmse, mae = mae)
-  
+
+  # Stack coefficients (union of names)
   all_names <- unique(unlist(lapply(coef_list, names)))
-  coef_mat <- matrix(NA_real_, nprev_eff, length(all_names), dimnames = list(NULL, all_names))
+  coef_mat <- matrix(NA_real_, nprev_eff, length(all_names),
+                     dimnames = list(NULL, all_names))
   for (k in seq_len(nprev_eff)) {
-    if (is.null(coef_list[[k]])) next
-    coef_k <- coef_list[[k]]
-    coef_mat[k, names(coef_k)] <- coef_k
+    ck <- coef_list[[k]]
+    if (length(ck)) coef_mat[k, names(ck)] <- ck
   }
-  
+
   list(
     pred = as.matrix(pred_vec),
     coef = coef_mat,
@@ -227,6 +272,7 @@ ardl.rolling.window = function(Y, X = NULL,
       h = h, type = type,
       p_fixed = p_fixed, q_fixed = q_fixed,
       p_max = p_max, q_max = q_max, use_x0 = use_x0,
+      P_maf = P_maf, marx_q = marx_q,
       p_chosen = p_used,
       q_chosen = q_used,
       bic = bic_used
