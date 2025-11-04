@@ -1,0 +1,152 @@
+########################################################
+### Diebold-Mariano (DM) tests
+#########################################################
+
+#####################################################
+#Set up for the tests of Random Forest vs. AR benchmark
+#####################################################
+
+#Compute squared loss for different horizons (RF)
+lrf1c=(oosy-rf1c$pred)^2
+lrf3c=(oosy-rf3c$pred)^2
+lrf6c=(oosy-rf6c$pred)^2
+lrf12c=(oosy-rf12c$pred)^2
+
+#Compute squared loss for different horizons (AR)
+lar1c=(oosy-bar1c$pred)^2
+lar3c=(oosy-bar3c$pred)^2
+lar6c=(oosy-bar6c$pred)^2
+lar12c=(oosy-bar12c$pred)^2
+
+#Compute loss differentials (d_t) for different horizons (AR-RF)
+darrf1=lar1c-lrf1c
+darrf3=lar3c-lrf3c
+darrf6=lar6c-lrf6c
+darrf12=lar12c-lrf12c
+
+#Create ts object containing loss differentials
+dtarrf.ts=ts(cbind(darrf1,darrf3,darrf6,darrf12), start=c(2001,1), end=c(2015,12), freq=12)
+colnames(dtarrf.ts)=c("1-step dt","3-step dt","6-step dt","12-step dt")
+#Plot them to examine stationarity:
+plot.ts(dtarrf.ts, main="Loss differential AR-RF",cex.axis=1.8)
+
+# RF-AR DM regressions
+
+#Regress d_t (AR-RF) for 1-step forecasts on a constant - get estimate of mean(d_t)
+dmarrf1=lm(darrf1~1) #regression
+acf(dmarrf1$residuals) #check serial correlation of residuals - number of significant autocorrelations is a good guess for number lags included in the HAC variance estimator
+dmarrf1$coefficients/sqrt(NeweyWest(dmarrf1,lag=5)) #form the DM t-statistic
+
+#3-step forecast test
+dmarrf3=lm(darrf3~1)
+acf(dmarrf3$residuals)
+dmarrf3$coefficients/sqrt(NeweyWest(dmarrf3,lag=5))
+
+#6-step forecast test
+dmarrf6=lm(darrf6~1)
+acf(dmarrf6$residuals)
+dmarrf6$coefficients/sqrt(NeweyWest(dmarrf6,lag=5))
+
+#12-step forecast test
+dmarrf12=lm(darrf12~1)
+acf(dmarrf12$residuals)
+dmarrf12$coefficients/sqrt(NeweyWest(dmarrf12,lag=5))
+
+
+#####################################################
+#Set up for the tests of LASSO vs. Random Forest
+#####################################################
+
+#Compute squared loss for different horizons (LASSO)
+l1c=(oosy-lasso1c$pred)^2
+l3c=(oosy-lasso3c$pred)^2
+l6c=(oosy-lasso6c$pred)^2
+l12c=(oosy-lasso12c$pred)^2
+
+#Compute loss differentials (d_t) for different horizons (LASSO-RF)
+dplrf1=l1c-lrf1c
+dplrf3=l3c-lrf3c
+dplrf6=l6c-lrf6c
+dplrf12=l12c-lrf12c
+
+#Create ts object containing loss differentials
+dtplrf.ts=ts(cbind(dplrf1,dplrf3,dplrf6,dplrf12), start=c(2001,1), end=c(2015,12), freq=12)
+#Plot them to examine stationarity:
+colnames(dtplrf.ts)=c("1-step dt","3-step dt","6-step dt","12-step dt")
+plot.ts(dtplrf.ts, main="Loss differential PLASSO-RF",cex.axis=1.8)
+
+#LASSO-RF DM regressions
+
+#1-step forecast test
+dmplrf1=lm(dplrf1~1)
+acf(dmplrf1$residuals)
+dmplrf1$coefficients/sqrt(NeweyWest(dmplrf1,lag=5))
+
+#3-step forecast test
+dmplrf3=lm(dplrf3~1)
+acf(dmplrf3$residuals)
+dmplrf3$coefficients/sqrt(NeweyWest(dmplrf3,lag=5))
+
+#6-step forecast test
+dmplrf6=lm(dplrf6~1)
+acf(dmplrf6$residuals)
+dmplrf6$coefficients/sqrt(NeweyWest(dmplrf6,lag=5))
+
+#12-step forecast test
+dmplrf12=lm(dplrf12~1)
+acf(dmplrf12$residuals)
+dmplrf12$coefficients/sqrt(NeweyWest(dmplrf12,lag=5))
+
+#####################################################
+# Set up for the tests of LASSO vs. AR
+#####################################################
+
+# Compute squared loss for different horizons (LASSO)
+l1c  <- (oosy - lasso1c$pred)^2
+l3c  <- (oosy - lasso3c$pred)^2
+l6c  <- (oosy - lasso6c$pred)^2
+l12c <- (oosy - lasso12c$pred)^2
+
+# Compute squared loss for different horizons (AR)
+lar1c  <- (oosy - bar1c$pred)^2
+lar3c  <- (oosy - bar3c$pred)^2
+lar6c  <- (oosy - bar6c$pred)^2
+lar12c <- (oosy - bar12c$pred)^2
+
+# Compute loss differentials (d_t) for different horizons (LASSO - AR)
+dlassoar1  <- l1c  - lar1c
+dlassoar3  <- l3c  - lar3c
+dlassoar6  <- l6c  - lar6c
+dlassoar12 <- l12c - lar12c
+
+# Create ts object containing loss differentials
+dtlassoar.ts <- ts(cbind(dlassoar1, dlassoar3, dlassoar6, dlassoar12),
+                   start = c(2001, 1), end = c(2015, 12), freq = 12)
+colnames(dtlassoar.ts) <- c("1-step dt", "3-step dt", "6-step dt", "12-step dt")
+
+# Plot to inspect stationarity
+plot.ts(dtlassoar.ts, main = "Loss differential LASSO-AR", cex.axis = 1.8)
+
+#####################################################
+# DM regressions (LASSO vs AR)
+#####################################################
+
+# 1-step forecast test
+dmlassoar1 <- lm(dlassoar1 ~ 1)
+acf(dmlassoar1$residuals)
+dmlassoar1$coefficients / sqrt(NeweyWest(dmlassoar1, lag = 5))
+
+# 3-step forecast test
+dmlassoar3 <- lm(dlassoar3 ~ 1)
+acf(dmlassoar3$residuals)
+dmlassoar3$coefficients / sqrt(NeweyWest(dmlassoar3, lag = 5))
+
+# 6-step forecast test
+dmlassoar6 <- lm(dlassoar6 ~ 1)
+acf(dmlassoar6$residuals)
+dmlassoar6$coefficients / sqrt(NeweyWest(dmlassoar6, lag = 5))
+
+# 12-step forecast test
+dmlassoar12 <- lm(dlassoar12 ~ 1)
+acf(dmlassoar12$residuals)
+dmlassoar12$coefficients / sqrt(NeweyWest(dmlassoar12, lag = 5))
