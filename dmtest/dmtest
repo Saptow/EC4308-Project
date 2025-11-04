@@ -157,3 +157,105 @@ dmlassoar6$coefficients / sqrt(NeweyWest(dmlassoar6, lag = 5))
 dmlassoar12 <- lm(dlassoar12 ~ 1)
 acf(dmlassoar12$residuals)
 dmlassoar12$coefficients / sqrt(NeweyWest(dmlassoar12, lag = 5))
+
+#####################################################
+# Set up for the tests of ADL vs. AR
+#####################################################
+
+# Compute squared loss for different horizons (ADL)
+ladl1c  <- (oosy - adl1c$pred)^2
+ladl3c  <- (oosy - adl3c$pred)^2
+ladl6c  <- (oosy - adl6c$pred)^2
+ladl12c <- (oosy - adl12c$pred)^2
+
+# Compute squared loss for different horizons (AR)  [already defined above: lar1c..lar12c]
+
+# Compute loss differentials (ADL - AR)
+dadlar1  <- ladl1c  - lar1c
+dadlar3  <- ladl3c  - lar3c
+dadlar6  <- ladl6c  - lar6c
+dadlar12 <- ladl12c - lar12c
+
+# Create ts object containing loss differentials
+dtadlar.ts <- ts(cbind(dadlar1, dadlar3, dadlar6, dadlar12),
+                 start = c(2001, 1), end = c(2015, 12), freq = 12)
+colnames(dtadlar.ts) <- c("1-step dt", "3-step dt", "6-step dt", "12-step dt")
+
+# Plot to inspect stationarity
+plot.ts(dtadlar.ts, main = "Loss differential ADL-AR", cex.axis = 1.8)
+
+# DM regressions (ADL vs AR)
+dmadlar1  <- lm(dadlar1  ~ 1);  acf(dmadlar1$residuals)
+dmadlar3  <- lm(dadlar3  ~ 1);  acf(dmadlar3$residuals)
+dmadlar6  <- lm(dadlar6  ~ 1);  acf(dmadlar6$residuals)
+dmadlar12 <- lm(dadlar12 ~ 1);  acf(dmadlar12$residuals)
+
+dmadlar1$coefficients  / sqrt(NeweyWest(dmadlar1,  lag = 5))
+dmadlar3$coefficients  / sqrt(NeweyWest(dmadlar3,  lag = 5))
+dmadlar6$coefficients  / sqrt(NeweyWest(dmadlar6,  lag = 5))
+dmadlar12$coefficients / sqrt(NeweyWest(dmadlar12, lag = 5))
+
+
+#####################################################
+# Set up for the tests of ADL vs. RF
+#####################################################
+
+# Compute squared loss for different horizons (ADL)  [already defined just above: ladl1c..ladl12c]
+# Compute squared loss for different horizons (RF)   [already defined above: lrf1c..lrf12c]
+
+# Compute loss differentials (ADL - RF)
+dadlrf1  <- ladl1c  - lrf1c
+dadlrf3  <- ladl3c  - lrf3c
+dadlrf6  <- ladl6c  - lrf6c
+dadlrf12 <- ladl12c - lrf12c 
+
+# Create ts object containing loss differentials
+dtadlrf.ts <- ts(cbind(dadlrf1, dadlrf3, dadlrf6, dadlrf12),
+                 start = c(2001, 1), end = c(2015, 12), freq = 12)
+colnames(dtadlrf.ts) <- c("1-step dt", "3-step dt", "6-step dt", "12-step dt")
+
+# Plot to inspect stationarity
+plot.ts(dtadlrf.ts, main = "Loss differential ADL-RF", cex.axis = 1.8)
+
+# DM regressions (ADL vs RF)
+dmadlrf1  <- lm(dadlrf1  ~ 1);  acf(dmadlrf1$residuals)
+dmadlrf3  <- lm(dadlrf3  ~ 1);  acf(dmadlrf3$residuals)
+dmadlrf6  <- lm(dadlrf6  ~ 1);  acf(dmadlrf6$residuals)
+dmadlrf12 <- lm(dadlrf12 ~ 1);  acf(dmadlrf12$residuals)
+
+dmadlrf1$coefficients  / sqrt(NeweyWest(dmadlrf1,  lag = 5))
+dmadlrf3$coefficients  / sqrt(NeweyWest(dmadlrf3,  lag = 5))
+dmadlrf6$coefficients  / sqrt(NeweyWest(dmadlrf6,  lag = 5))
+dmadlrf12$coefficients / sqrt(NeweyWest(dmadlrf12, lag = 5))
+
+#####################################################
+# Set up for the tests of LASSO vs. ADL
+#####################################################
+
+# Compute squared loss for different horizons (LASSO) [already defined above: l1c..l12c]
+# Compute squared loss for different horizons (ADL)   [already defined above: ladl1c..ladl12c]
+
+# Compute loss differentials (LASSO - ADL)
+dlassoadl1  <- l1c  - ladl1c
+dlassoadl3  <- l3c  - ladl3c
+dlassoadl6  <- l6c  - ladl6c
+dlassoadl12 <- l12c - ladl12c
+
+# Create ts object containing loss differentials
+dtlassoadl.ts <- ts(cbind(dlassoadl1, dlassoadl3, dlassoadl6, dlassoadl12),
+                    start = c(2001, 1), end = c(2015, 12), freq = 12)
+colnames(dtlassoadl.ts) <- c("1-step dt", "3-step dt", "6-step dt", "12-step dt")
+
+# Plot to inspect stationarity
+plot.ts(dtlassoadl.ts, main = "Loss differential LASSO-ADL", cex.axis = 1.8)
+
+# DM regressions (LASSO vs ADL)
+dmlassoadl1  <- lm(dlassoadl1  ~ 1);  acf(dmlassoadl1$residuals)
+dmlassoadl3  <- lm(dlassoadl3  ~ 1);  acf(dmlassoadl3$residuals)
+dmlassoadl6  <- lm(dlassoadl6  ~ 1);  acf(dmlassoadl6$residuals)
+dmlassoadl12 <- lm(dlassoadl12 ~ 1);  acf(dmlassoadl12$residuals)
+
+dmlassoadl1$coefficients  / sqrt(NeweyWest(dmlassoadl1,  lag = 5))
+dmlassoadl3$coefficients  / sqrt(NeweyWest(dmlassoadl3,  lag = 5))
+dmlassoadl6$coefficients  / sqrt(NeweyWest(dmlassoadl6,  lag = 5))
+dmlassoadl12$coefficients / sqrt(NeweyWest(dmlassoadl12, lag = 5))
