@@ -1,124 +1,173 @@
 rm(list=ls())
+#setwd()
 load("fredmd.RData") 
 
 library(glmnet)
+library(HDeconometrics)
+library(sandwich) #library to estimate variance for DM test regression using NeweyWest()
+library(hdm)
 
-# --- 1) -----------------------------------------------
-Yraw <- md
+### Some preliminary data manipulation
+Y = md
+dum=rep(0,nrow(Y)) 
+dum[372:480]=1 #create dummy DEC 2010 onwards = 1
+Y=cbind(Y,dum=dum) #add dummy to data matrix
+Y <- Y[, !(names(Y) %in% c("date","ACOGNO")), drop = FALSE] #remove date col and ACOGNO
+Y <- as.matrix(Y)
 
-# keep columns with no NAs (or skip this if you prefer to impute)
-Y <- Yraw[, colSums(is.na(Yraw)) == 0, drop = FALSE]
+indice = which(colnames(Y) == "UNRATE")
 
-# parse date & build dummy (Dec 2010 onward)
-Y$date <- as.Date(Y$date)  # adjust if your format differs
-Y$dummy <- as.numeric(Y$date >= as.Date("2010-12-01"))
+yy=Y[, "UNRATE"] #get the y variable - unemployment rate
 
-nprev <- 120
-yy <- Y$UNRATE
-oosy  <- tail(yy, nprev)  
+nprev=120 #number of out-of-sample observations (test window )
+
+oosy=tail(yy,nprev) #auxiliary:get the out-of-sample true values (last 120 obs. using tail())
 
 
-# --- 2) Define y and X -------------------------------------------
-y_vec <- as.numeric(Y$UNRATE)
-X_df  <- Y[, setdiff(names(Y), c("UNRATE", "date")), drop = FALSE]
+######################################
+#LASSO AND ROLLING WINDOW FUNCTION
+######################################
 
-# ensure numeric matrix
-stopifnot(all(sapply(X_df, is.numeric)))
-X_mat <- as.matrix(X_df)
-
-# optional: check & handle non-finite
-X_mat[!is.finite(X_mat)] <- NA
-y_vec[!is.finite(y_vec)] <- NA
-
-# if any NA remain, drop those rows consistently (or impute instead)
-keep <- complete.cases(X_mat, y_vec)
-X_mat <- X_mat[keep, , drop = FALSE]
-y_vec <- y_vec[keep]
-date_vec <- Y$date[keep]  # for plotting later if needed
-
-# --- 3) Add 8 principal components ----------------------------------------
-pca <- princomp(scale(X_mat, scale = FALSE))
-pc_scores <- pca$scores[, 1:8, drop = FALSE]
-X_aug <- cbind(X_mat, pc_scores)
-
-# --- 4) Add 4 lags to ALL predictors (current + 4 lags) -------------------
-k <- 5  # 1 current + 4 lags
-lagged <- embed(X_aug, k)                      # (n - 4) x (k * p)
-X_lagged <- lagged[, -(1:ncol(X_aug)), drop=FALSE]  # drop “current” block
-y_lagged <- y_vec[k:length(y_vec)]                 # align y to lags
-date_lagged <- date_vec[k:length(date_vec)]        # optional for plotting
-
-stopifnot(nrow(X_lagged) == length(y_lagged))
-
-# --- 5) Rolling LASSO (CV lambda per window) ------------------------------
-rolling_lasso <- function(x, y, window = 120, h = 1, alpha = 1) {
-  n <- nrow(x); preds <- rep(NA_real_, n)
-  grid <- 10^seq(1, -4, length = 100)
-  for (t in seq(window, n - h)) {
-    tr <- (t - window + 1):t
-    va <- t + h
-    cv  <- cv.glmnet(x[tr, ], y[tr], alpha = alpha, lambda = grid)
-    fit <- glmnet(   x[tr, ], y[tr], alpha = alpha, lambda = grid)
-    preds[va] <- predict(fit, s = cv$lambda.min, newx = x[va, , drop = FALSE])
+runlasso=function(Y,indice,lag,alpha=1,IC="bic"){
+  
+  dum=Y[,ncol(Y)] # extract dummy from data
+  Y=Y[,-ncol(Y)] #data without the dummy
+  comp=princomp(scale(Y,scale=FALSE)) # compute principal components to add as predictors
+  Y2=cbind(Y,comp$scores[,1:8]) #augment predictors by the first 8 principal components
+  aux=embed(Y2,4+lag) #create 4 lags + forecast horizon shift (=lag option)
+  y=aux[,indice] #  Y variable aligned/adjusted for missing data due do lags
+  X=aux[,-c(1:(ncol(Y2)*lag))]   # lags of Y (predictors) corresponding to forecast horizon   
+  
+  if(lag==1){
+    X.out=tail(aux,1)[1:ncol(X)] #retrieve the last observations if one-step forecast  
+  }else{
+    X.out=aux[,-c(1:(ncol(Y2)*(lag-1)))] #delete first (h-1) columns of aux,
+    X.out=tail(X.out,1)[1:ncol(X)] #last observations: y_T,y_t-1...y_t-h
   }
-  valid <- which(!is.na(preds))
-  list(
-    pred = preds,
-    rmse = sqrt(mean((y[valid] - preds[valid])^2))
-  )
+  dum=tail(dum,length(y)) #cut the dummy to size to account for lost observations due to lags
+  
+  #Here we use the glmnet wrapper written by the authors that does selection on IC:
+  model=ic.glmnet(cbind(scale(X),dum),y,crit=IC,alpha = alpha) #fit the LASSO model selected on IC
+  
+  pred=predict(model,c(X.out,1)) #generate the forecast (note c(X.out,0) gives the last observations on X's and the dummy (the zero))
+  
+  return(list("model"=model,"pred"=pred)) #return the estimated model and h-step forecast
 }
 
-# Create multi-horizon target vectors
-y1  <- y_lagged[1:(length(y_lagged) - 1)]
-y3  <- y_lagged[1:(length(y_lagged) - 3)]
-y6  <- y_lagged[1:(length(y_lagged) - 6)]
-y12 <- y_lagged[1:(length(y_lagged) - 12)]
-
-# Corresponding predictor matrices (trim last h rows so y and X align)
-x1  <- X_lagged[1:(nrow(X_lagged) - 1), , drop = FALSE]
-x3  <- X_lagged[1:(nrow(X_lagged) - 3), , drop = FALSE]
-x6  <- X_lagged[1:(nrow(X_lagged) - 6), , drop = FALSE]
-x12 <- X_lagged[1:(nrow(X_lagged) - 12), , drop = FALSE]
-
-
-set.seed(578903)
-res1  <- rolling_lasso(x1,  y1,  window = 120, h = 1,  alpha = 1)
-res3  <- rolling_lasso(x3,  y3,  window = 120, h = 3,  alpha = 1)
-res6  <- rolling_lasso(x6,  y6,  window = 120, h = 6,  alpha = 1)
-res12 <- rolling_lasso(x12, y12, window = 120, h = 12, alpha = 1)
-
-res1$rmse; res3$rmse; res6$rmse; res12$rmse
-
-oos_slice <- function(res, y, nprev) {
-  idx <- (length(y) - nprev + 1):length(y)
-  list(
-    true = y[idx],
-    pred = tail(res$pred, nprev),
-    idx  = idx
-  )
+########
+lasso.rolling.window=function(Y,nprev,indice=1,lag=1,alpha=1,IC="bic"){
+  
+  save.coef=matrix(NA,nprev,37-3+ncol(Y[,-1])*4 ) #blank matrix for coefficients at each iteration
+  save.pred=matrix(NA,nprev,1) #blank for forecasts
+  for(i in nprev:1){ #NB: backwards FOR loop: going from 120 down to 1
+    Y.window=Y[(1+nprev-i):(nrow(Y)-i),] #define the estimation window (first one: 1 to 491, then 2 to 492 etc.)
+    lasso=runlasso(Y.window,indice,lag,alpha,IC) #call the function to fit the LASSO selected on IC and generate h-step forecast
+    save.coef[(1+nprev-i),]=lasso$model$coef #save estimated coefficients
+    save.pred[(1+nprev-i),]=lasso$pred #save the forecast
+    cat("iteration",(1+nprev-i),"\n") #display iteration number
+    cat("pred", save.pred[(1+nprev-i)],"\n")
+  }
+  #Some helpful stuff:
+  real=Y[,indice] #get actual values
+  plot(real,type="l")
+  lines(c(rep(NA,length(real)-nprev),save.pred),col="red") #padded with NA for blanks, plot predictions vs. actual
+  
+  rmse=sqrt(mean((tail(real,nprev)-save.pred)^2)) #compute RMSE
+  mae=mean(abs(tail(real,nprev)-save.pred)) #compute MAE (Mean Absolute Error)
+  errors=c("rmse"=rmse,"mae"=mae) #stack errors in a vector
+  
+  return(list("pred"=save.pred,"coef"=save.coef,"errors"=errors)) #return forecasts, history of estimated coefficients, and RMSE and MAE for the period.
 }
 
-# extract OOS segments for each horizon
-o1  <- oos_slice(res1,  y1,  nprev)
-o3  <- oos_slice(res3,  y3,  nprev)
-o6  <- oos_slice(res6,  y6,  nprev)
-o12 <- oos_slice(res12, y12, nprev)
 
 
-# --- plot ---
+############################################################################
+#Penalized regression: LASSO forecasts (BIC, AIC, AICc)
+############################################################################
+
+#Add the functions  in func-lasso.R (must be in your working directory)
+#Or simply open up func-lasso.R and execute the function commands there
+
+
+alpha=1 #set alpha=1 for LASSO
+
+#Run forecasts for LASSO (BIC)
+lasso1c=lasso.rolling.window(Y,nprev,indice,1,alpha,IC="bic")
+lasso3c=lasso.rolling.window(Y,nprev,indice,3,alpha,IC="bic")
+lasso6c=lasso.rolling.window(Y,nprev,indice,6,alpha,IC="bic")
+lasso12c=lasso.rolling.window(Y,nprev,indice,12,alpha,IC="bic")
+
+#LASSO(BIC) RMSE's
+lasso.rmse1=lasso1c$errors[1]
+lasso.rmse3=lasso3c$errors[1]
+lasso.rmse6=lasso6c$errors[1]
+lasso.rmse12=lasso12c$errors[1]
+
+
+#Run forecasts for LASSO (AIC)
+
+lasso1ca=lasso.rolling.window(Y,nprev,indice,1,alpha,IC="aic")
+lasso3ca=lasso.rolling.window(Y,nprev,indice,3,alpha,IC="aic")
+lasso6ca=lasso.rolling.window(Y,nprev,indice,6,alpha,IC="aic")
+lasso12ca=lasso.rolling.window(Y,nprev,indice,12,alpha,IC="aic")
+
+#LASSO(AIC) RMSE's
+lassoa.rmse1=lasso1ca$errors[1]
+lassoa.rmse3=lasso3ca$errors[1]
+lassoa.rmse6=lasso6ca$errors[1]
+lassoa.rmse12=lasso12ca$errors[1]
+
+
+#Run forecasts for LASSO (AICc)
+lasso1caic=lasso.rolling.window(Y,nprev,indice,1,alpha,IC="aicc")
+lasso3caic=lasso.rolling.window(Y,nprev,indice,3,alpha,IC="aicc")
+lasso6caic=lasso.rolling.window(Y,nprev,indice,6,alpha,IC="aicc")
+lasso12caic=lasso.rolling.window(Y,nprev,indice,12,alpha,IC="aicc")
+
+#LASSO(AICc) RMSE's
+lassoac.rmse1=lasso1caic$errors[1]
+lassoac.rmse3=lasso3caic$errors[1]
+lassoac.rmse6=lasso6caic$errors[1]
+lassoac.rmse12=lasso12caic$errors[1]
+
+################################################
+##Plot ML forecasts for 1, 3, 6, 12-steps
+##############################################
+
+#Create the time series object collecting 1-step best=performing ML forecasts
+bench1.ts=ts(cbind(oosy,lasso1caic$pred), start=c(2010,1), end=c(2019,12), freq=12)
+colnames(bench1.ts)=c("True Value","LASSO")
+
+#Create the time series object collecting 1-step best=performing ML forecasts
+bench3.ts=ts(cbind(oosy,lasso3caic$pred), start=c(2010,1), end=c(2019,12), freq=12)
+colnames(bench3.ts)=c("True Value","LASSO")
+
+#Create the time series object collecting 1-step best=performing ML forecasts
+bench6.ts=ts(cbind(oosy,lasso6c$pred), start=c(2010,1), end=c(2019,12), freq=12)
+colnames(bench6.ts)=c("True Value","LASSO")
+
+#Create the time series object collecting 1-step best=performing ML forecasts
+bench12.ts=ts(cbind(oosy,lasso12caic$pred), start=c(2010,1), end=c(2019,12), freq=12)
+colnames(bench12.ts)=c("True Value","LASSO")
+
 par(mfrow = c(2,2))
 
-plot(oosy,  type="l", main="1-Step Ahead",  ylab="UNRATE", xlab="Time")
-lines(o1$pred,  col="red")
-legend("topright", c("Actual","Pred"), col=c("black","red"), lty=1, bty="n")
+#Plot the graph for 1-step forecasts
+plot.ts(bench1.ts[,1], main="1-step LASSO forecast", cex.axis=1.5, lwd=2, ylab="UNRATE")
+points(bench1.ts[,2], type="l", col="red",lwd=2.8)
+legend("bottomleft", c("UNRATE","LASSO"), lty=c(1,1) ,col=c("black","red"))
 
-plot(oosy,  type="l", main="3-Step Ahead",  ylab="UNRATE", xlab="Time")
-lines(o3$pred,  col="blue")
+#Plot the graph for 3-step forecasts
+plot.ts(bench3.ts[,1], main="3-step LASSO forecast", cex.axis=1.5, lwd=2, ylab="UNRATE")
+points(bench3.ts[,2], type="l", col="red",lwd=2.8)
+legend("bottomleft", c("UNRATE","LASSO"), lty=c(1,1) ,col=c("black","red"))
 
-plot(oosy,  type="l", main="6-Step Ahead",  ylab="UNRATE", xlab="Time")
-lines(o6$pred,  col="green")
+#Plot the graph for 6-step forecasts
+plot.ts(bench6.ts[,1], main="6-step LASSO forecast", cex.axis=1.5, lwd=2, ylab="UNRATE")
+points(bench6.ts[,2], type="l", col="red",lwd=2.8)
+legend("bottomleft", c("UNRATE","LASSO"), lty=c(1,1) ,col=c("black","red"))
 
-plot(oosy, type="l", main="12-Step Ahead", ylab="UNRATE", xlab="Time")
-lines(o12$pred, col="purple")
-
-par(mfrow = c(1,1))
+#Plot the graph for 12-step forecasts
+plot.ts(bench12.ts[,1], main="12-step LASSO forecast", cex.axis=1.5, lwd=2, ylab="UNRATE")
+points(bench12.ts[,2], type="l", col="red",lwd=2.8)
+legend("bottomleft", c("UNRATE","LASSO"), lty=c(1,1) ,col=c("black","red"))
