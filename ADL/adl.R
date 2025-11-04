@@ -130,6 +130,15 @@ res_fixed3 <- get(load("./ADL/adl_rolling_fixed_h3.RData"))
 res_fixed6 <- get(load("./ADL/adl_rolling_fixed_h6.RData"))
 res_fixed12 <- get(load("./ADL/adl_rolling_fixed_h12.RData"))
 
+res_maf1 <- get(load("./ADL/adl_rolling_maf_h1.RData"))
+res_maf3 <- get(load("./ADL/adl_rolling_maf_h3.RData"))
+res_maf6 <- get(load("./ADL/adl_rolling_maf_h6.RData"))
+res_maf12 <- get(load("./ADL/adl_rolling_maf_h12.RData"))
+
+res_marx1 <- get(load("./ADL/adl_rolling_marx_h1.RData"))
+res_marx3 <- get(load("./ADL/adl_rolling_marx_h3.RData"))
+res_marx6 <- get(load("./ADL/adl_rolling_marx_h6.RData"))   
+res_marx12 <- get(load("./ADL/adl_rolling_marx_h12.RData"))
 # ============================================
 # Helper Functions
 # ============================================
@@ -159,6 +168,8 @@ q_bic1 <- apply(res_bic1$coef, 1, get_q)
 q_bic3 <- apply(res_bic3$coef, 1, get_q)
 q_bic6 <- apply(res_bic6$coef, 1, get_q)
 q_bic12 <- apply(res_bic12$coef, 1, get_q)
+
+
 
 # ============================================
 # Plot (p,q) selections over time
@@ -281,21 +292,105 @@ legend("topright",
 par(mfrow = c(1, 1))
 
 # ============================================
-# Table to compare RMSE and MAE
+# Compare forecasts: MAF vs MARX vs BIC
 # ============================================
+# Get true out-of-sample values
 
-performance_table <- data.frame(
-  Horizon = rep(c("h=1", "h=3", "h=6", "h=12"), 2),
-  Model = c(rep("BIC", 4), rep("Fixed(4,4)", 4)),
-  RMSE = c(res_bic1$errors[1], res_bic3$errors[1], 
-           res_bic6$errors[1], res_bic12$errors[1],
-           res_fixed1$errors[1], res_fixed3$errors[1], 
-           res_fixed6$errors[1], res_fixed12$errors[1]),
-  MAE = c(res_bic1$errors[2], res_bic3$errors[2], 
-          res_bic6$errors[2], res_bic12$errors[2],
-          res_fixed1$errors[2], res_fixed3$errors[2], 
-          res_fixed6$errors[2], res_fixed12$errors[2])
-)
-print(performance_table)
+# Helper: plot ARDL benchmark for a given horizon
+plot_ardl_bench <- function(res_bic, res_fixed, real,
+                            h, end = c(2019, 12), freq = 12,
+                            ylab = "Change in Unemployment Rate",
+                            main = NULL) {
+  # Align lengths (just in case)
+  L <- min(length(res_bic$pred), length(res_fixed$pred))
+  stopifnot(L > 0)
+  bic   <- as.numeric(res_bic$pred)[seq_len(L)]
+  fixed <- as.numeric(res_fixed$pred)[seq_len(L)]
+  true  <- tail(as.numeric(real), L)
+
+  M <- cbind(bic, fixed, true)
+  colnames(M) <- c("ARDL-BIC", "ARDL-Fixed", "True")
+
+  # Use fixed end date; ts() computes the correct start automatically
+  obj <- ts(M, end = end, frequency = freq)
+
+  if (is.null(main)) main <- sprintf("%d-step Ahead Forecast", h)
+
+  plot.ts(obj[, "True"], main = main,
+          cex.axis = 1.2, lwd = 2, col = "black",
+          ylab = ylab, ylim = range(obj, na.rm = TRUE))
+  lines(obj[, "ARDL-BIC"],   col = "blue", lwd = 1.5)
+  lines(obj[, "ARDL-Fixed"], col = "red",  lwd = 1.5, lty = 2)
+  legend("topright",
+         legend = c("ARDL-BIC", "ARDL-Fixed", "Actual"),
+         col = c("blue", "red", "black"),
+         lty = c(1, 2, 1), lwd = c(1.5, 1.5, 2),
+         bty = "n", cex = 0.8)
+}
 
 
+# True series and end date
+real <- as.numeric(Y[, 1])
+end_date <- c(2019, 12)
+
+options(repr.plot.width = 12, repr.plot.height = 6)
+
+# h = 1
+plot_ardl_bench(res_bic1,  res_fixed1,  real, h = 1,  end = end_date)
+
+# h = 3
+plot_ardl_bench(res_bic3,  res_fixed3,  real, h = 3,  end = end_date)
+
+# h = 6
+plot_ardl_bench(res_bic6,  res_fixed6,  real, h = 6,  end = end_date)
+
+# h = 12
+plot_ardl_bench(res_bic12, res_fixed12, real, h = 12, end = end_date)
+
+par(mfrow = c(1, 1))
+
+# Build a performance table for BIC, Fixed, MAF, MARX across h = 1,3,6,12
+make_perf_table <- function() {
+  horizons <- c(1, 3, 6, 12)
+  model_key <- c("BIC" = "bic", "Fixed(4,4)" = "fixed", "MAF" = "maf", "MARX" = "marx")
+
+  rows <- list()
+  for (h in horizons) {
+    for (model_label in names(model_key)) {
+      tag <- model_key[[model_label]]
+      obj_name <- sprintf("res_%s%d", tag, h)  # e.g., res_bic3, res_maf6, etc.
+
+      res <- get0(obj_name, inherits = TRUE, ifnotfound = NULL)
+      if (is.null(res)) next  # skip if you haven't run that model/horizon
+
+      # errors = c(rmse, mae) per your runARDL/rolling code
+      rmse <- as.numeric(res$errors[1])
+      mae  <- as.numeric(res$errors[2])
+
+      rows[[length(rows) + 1]] <- data.frame(
+        Horizon = paste0("h=", h),
+        Model   = model_label,
+        RMSE    = rmse,
+        MAE     = mae,
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+
+  if (!length(rows)) {
+    warning("No results found (res_* objects missing?).")
+    return(invisible(NULL))
+  }
+
+  out <- do.call(rbind, rows)
+  rownames(out) <- NULL
+
+  # Optional: order by Horizon then Model
+  out$Horizon <- factor(out$Horizon, levels = paste0("h=", c(1,3,6,12)))
+  out <- out[order(out$Horizon, out$Model), ]
+
+  out
+}
+
+performance_table <- make_perf_table()
+print(performance_table, row.names = FALSE)
