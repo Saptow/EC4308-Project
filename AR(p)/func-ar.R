@@ -1,85 +1,119 @@
 # ============================================
-# AR(p) direct h-step forecast 
+# AR(p) direct h-step with contemporaneous dummy
 # ============================================
 
-runAR = function(Y, indice, lag, type="fixed"){
-  # make sure Y2 is a numeric matrix for embed()
-  Y2  = as.matrix(Y[, indice, drop = FALSE])
-  aux = embed(Y2, 4 + lag)
+runAR <- function(Y, h = 1, target_name = "UNRATE", type = "fixed") {
+  L_max <- 4  # max lag of y
   
-  y = aux[, 1, drop = FALSE]
-  X = aux[, -(1:(ncol(Y2) * lag)), drop = FALSE]   # AR lags (up to 4)
+  # 0) Drop date; split into train (1..T-1) and last row T (forecast origin)
+  Y     <- Y[, -1, drop = FALSE]
+  Y_in  <- Y[-nrow(Y), , drop = FALSE]
+  Y_out <- Y[nrow(Y),  , drop = FALSE]
   
-  # unified, horizon-safe X.out
-  X.out = t(tail(aux, 1)[1:ncol(X), drop = FALSE])
+  # Identify target and dummy at last column
+  idx_y   <- which(colnames(Y_in) == target_name)
+  idx_dum <- ncol(Y_in)
   
-  if(type == "fixed"){  # AR(4)
-    model = lm(y ~ X)
-    ar.coef = coef(model)                          # length 1+4 in usual cases
-    coef = rep(0, ncol(X) + 1)                     # pad to 5
-    coef[1:length(ar.coef)] = ar.coef
-  }
+  # Pull series as numeric vectors
+  y_train <- as.numeric(Y_in[, idx_y])
+  d_train <- as.numeric(Y_in[, idx_dum])  # contemporaneous dummy
+  d_new   <- as.numeric(Y_out[, idx_dum]) # dummy at forecast origin t
   
-  if(type == "bic"){   # choose p ∈ {1,2,3,4} by BIC
-    bb = Inf
-    best = NULL
-    for(i in seq_len(ncol(X))){
-      m = lm(y ~ X[, 1:i, drop = FALSE])
-      crit = BIC(m)
-      if(crit < bb){
-        bb = crit
-        best = m
-      }
+  # 1) Build lag panel for y 
+  k_max <- h + L_max + 1
+  if (length(y_train) < k_max) stop("Window too short for h + L_max + 1 lags.")
+  aux <- embed(y_train, k_max)                    
+  colnames(aux) <- paste0("y_L", 0:(k_max - 1))
+  
+  # Align dummy 
+  d_aligned <- tail(d_train, nrow(aux))
+  
+  # Target is y_{t+h}
+  y_vec <- aux[, paste0("y_L", h)]           
+  
+  # 2) Choose lag order p
+  if (identical(type, "fixed")) {
+    p <- L_max
+  } else if (identical(type, "bic")) {
+    best_bic <- Inf; best_p <- 1
+    for (pp in 1:L_max) {
+      lag_names <- paste0("y_L", (h + 1):(h + pp))
+      X_pp <- as.data.frame(cbind(aux[, lag_names, drop = FALSE], DUM = d_aligned),
+                            check.names = FALSE)
+      df_pp <- data.frame(y = y_vec, X_pp, check.names = FALSE)
+      m_pp  <- lm(y ~ ., data = df_pp)
+      b_pp  <- BIC(m_pp)
+      if (b_pp < best_bic) { best_bic <- b_pp; best_p <- pp }
     }
-    model   = best
-    ar.coef = coef(model)                          # length 1 + p (p ≤ 4)
-    coef    = rep(0, ncol(X) + 1)                  # force length 5
-    coef[1:length(ar.coef)] = ar.coef
-  }
+    p <- best_p
+  } else stop('type must be "fixed" or "bic"')
   
-  pred = c(1, X.out[1, 1:ncol(X)]) %*% coef
-  list(model = model, pred = as.numeric(pred), coef = coef)
+  # 3) Final regressors: AR p lags of y + contemporaneous dummy
+  lag_names <- paste0("y_L", (h + 1):(h + p))
+  X_df <- as.data.frame(cbind(aux[, lag_names, drop = FALSE], DUM = d_aligned),
+                        check.names = FALSE)
+  # ensure proper column names (no recycling surprises)
+  colnames(X_df) <- c(lag_names, "DUM")
+  df <- data.frame(y = y_vec, X_df, check.names = FALSE)
+  
+  # Horizon-safe prediction row — build with a named list so dims never drop
+  last_row_vals <- as.numeric(aux[nrow(aux), lag_names, drop = FALSE])
+  names(last_row_vals) <- lag_names
+  X_new <- as.data.frame(as.list(c(last_row_vals, DUM = d_new)), check.names = FALSE)
+  # guarantee the same column order as X_df
+  X_new <- X_new[, colnames(X_df), drop = FALSE]
+  
+  # 4) Fit and predict
+  model <- lm(y ~ ., data = df)
+  pred  <- as.numeric(predict(model, newdata = X_new))
+  
+  # Pad coefficients for consistent storage: 1 (intcpt) + 4 lags + 1 dummy = 6
+  ar_coef  <- coef(model)
+  coef_pad <- rep(NA_real_, 1 + L_max + 1)
+  coef_pad[1:length(ar_coef)] <- ar_coef
+  
+  list(model = model, pred = pred, coef = coef_pad, p = p)
 }
 
 
-
 # =====================================================
-# Rolling window for AR(p) direct h-step forecasting
+# Rolling window (same mapping as your RF template)
 # =====================================================
 
-ar.rolling.window = function(Y, nprev, indice = 1, lag = 1, type = "fixed"){
+ar.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE", type = "fixed") {
+  L_max <- 4
+  save.coef <- matrix(NA_real_, nprev, 1 + L_max + 1)  # (Intercept) + up to 4 lags + DUM
+  save.pred <- matrix(NA_real_, nprev, 1)
+  save.p    <- integer(nprev)
   
-  # For h>1, the last (h-1) forecasts would target beyond sample.
-  # Compute and score only the comparable ones.
-  # ### FIX: effective OOS size for horizon h
-  nprev_eff = nprev - (lag - 1)
-  if(nprev_eff <= 0) stop("nprev must be >= lag")
-  
-  save.coef = matrix(NA_real_, nprev_eff, 5)         # intercept + up to 4 lags
-  save.pred = matrix(NA_real_, nprev_eff, 1)
-  
-  N = nrow(Y)
-  pos = 1
-  # i goes from nprev down to lag so that target (end + lag) stays within sample
-  for(i in seq(nprev, lag, by = -1)){
-    Y.window = Y[(1 + nprev - i):(N - i), , drop = FALSE]
+  set.seed(12455)
+  for (i in nprev:max(h,1)) {
+    Y.window <- Y[(1 + nprev - i):(nrow(Y) - i), , drop = FALSE]
+    fit <- runAR(Y.window, h = h, target_name = target_name, type = type)
     
-    fact = runAR(Y.window, indice, lag, type)
-    save.coef[pos, ] = fact$coef
-    save.pred[pos, ] = fact$pred
+    t   <- nrow(Y) - i          
+    u   <- t + h                
+    pos <- u - (nrow(Y) - nprev) 
+    
+    if (pos >= 1 && pos <= nprev) {
+      save.pred[pos, ] <- fit$pred
+      save.coef[pos, ] <- fit$coef
+      save.p[pos]      <- fit$p
+    }
     cat("iteration", pos, "\n")
-    pos = pos + 1
   }
   
-  # --- Plot actual vs. predictions (aligned) ---
-  real = Y[, indice]
-  # last nprev_eff actuals align with the produced forecasts
-  y_true = tail(real, nprev_eff)
-
-  # --- Errors on aligned OOS segment ---
-  rmse = sqrt(mean((y_true - save.pred[, 1])^2))
-  mae  = mean(abs(y_true - save.pred[, 1]))
-  errors = c("rmse" = rmse, "mae" = mae)
   
-  return(list("pred" = save.pred, "coef" = save.coef, "errors" = errors))
+  real       <- Y[, which(colnames(Y) == target_name)]
+  y_test_all <- tail(real, nprev)
+  pred_all   <- save.pred[, 1]
+  valid      <- !is.na(pred_all)
+  
+  rmse <- sqrt(mean((y_test_all[valid] - pred_all[valid])^2))
+  mae  <- mean(abs(y_test_all[valid] - pred_all[valid]))
+  errors <- c(rmse = rmse, mae = mae, n_effective = sum(valid))
+  
+  list(pred = save.pred, coef = save.coef, p_used = save.p, errors = errors)
 }
+
+

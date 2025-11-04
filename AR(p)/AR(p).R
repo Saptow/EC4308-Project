@@ -4,38 +4,23 @@
 load("data/fredmd.RData")
 
 Y = md
-nprev = 120
-Ytrain = head(Y, nrow(Y) - nprev)
-idx = which(colnames(Ytrain) == "UNRATE") # index for unemployment rate
-yy = Y[, "UNRATE"]  
-oosy = tail(yy, nprev)    # out-of-sample true values
+Y = Y[,-59] #drop New Orders for Consumer Goods (ACOGNO) due to insufficient data
 
-# Checking for outliers in unrate
-library(forecast)
-unrate_ts <- ts(Ytrain[["UNRATE"]], frequency = 12)  
-out <- forecast::tsoutliers(unrate_ts)
-out$index            
-out$replacements     
-time(unrate_ts)[out$index]  
+#Create dummy variable after Nov 2010 to handle structural break
+cutoff = as.Date("2010-11-01")
+Y$DUM = ifelse(Y[, 1] > cutoff, 1, 0)
+nprev = 120 #test size
+
 
 
 source("Ar(p)/func-ar.R")
 # Test using rolling window 
-bar1c=ar.rolling.window(Y,nprev,idx,1,type="bic") #1-step AR forecast
-bar3c=ar.rolling.window(Y,nprev,idx,3,type="bic") #3-step AR forecast
-bar6c=ar.rolling.window(Y,nprev,idx,6,type="bic") #6-step AR forecast
-bar12c=ar.rolling.window(Y,nprev,idx,12,type="bic") #12-step AR forecast
+bar1c=ar.rolling.window(Y, nprev, h = 1, target_name = "UNRATE", type = "bic") #1-step AR forecast
+bar3c=ar.rolling.window(Y, nprev, h = 3, target_name = "UNRATE", type = "bic") #3-step AR forecast
+bar6c=ar.rolling.window(Y, nprev, h = 6, target_name = "UNRATE", type = "bic") #6-step AR forecast
+bar12c=ar.rolling.window(Y, nprev, h = 12, target_name = "UNRATE", type = "bic") #12-step AR forecast
 
-get_p <- function(coef_row){
-  nz <- which(abs(coef_row[-1]) > 1e-6) 
-  if(length(nz) == 0) return(0)
-  max(nz)
-}
 
-p1 = apply(bar1c$coef, 1, get_p)
-p3 = apply(bar3c$coef, 1, get_p)
-p6 = apply(bar6c$coef, 1, get_p)
-p12 = apply(bar12c$coef, 1, get_p)
 
 # Plotting
 arcoef.ts=ts(bar1c$coef, start=c(2010,1), end=c(2019,12), freq=12)
