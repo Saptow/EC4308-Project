@@ -1,6 +1,7 @@
-########################################################
-### Diebold-Mariano (DM) tests
-#########################################################
+# Diebold-Mariano (DM) tests 
+# Comparing forecasting models against AR benchmark
+
+rm(list=ls())
 
 # Required libraries
 library(sandwich)   # for NeweyWest HAC estimator
@@ -8,254 +9,388 @@ library(lmtest)     # for coeftest, regression testing tools
 library(stats)      # for lm(), acf(), ts(), plot.ts()
 library(graphics)   # for plotting functions (plot.ts)
 
+# Load all files
+# Data
+load("data/fredmd_cleaned.RData")  
 
-#####################################################
-#Set up for the tests of Random Forest vs. AR benchmark
-#####################################################
+# AR
+load("AR(p)/ar_h1.RData")
+load("AR(p)/ar_h3.RData")
+load("AR(p)/ar_h6.RData")
+load("AR(p)/ar_h12.RData")
 
-#Compute squared loss for different horizons (RF)
-lrf1c=(oosy-rf1c$pred)^2
-lrf3c=(oosy-rf3c$pred)^2
-lrf6c=(oosy-rf6c$pred)^2
-lrf12c=(oosy-rf12c$pred)^2
+# ADL
+load("ADL/adl_rolling_fixed_h1.RData")
+adl_bench_1c <- res_fixed
+rm(res_fixed)
 
-#Compute squared loss for different horizons (AR)
-lar1c=(oosy-bar1c$pred)^2
-lar3c=(oosy-bar3c$pred)^2
-lar6c=(oosy-bar6c$pred)^2
-lar12c=(oosy-bar12c$pred)^2
+load("ADL/adl_rolling_fixed_h3.RData")
+adl_bench_3c <- res_fixed
+rm(res_fixed)
 
-#Compute loss differentials (d_t) for different horizons (AR-RF)
-darrf1=lar1c-lrf1c
-darrf3=lar3c-lrf3c
-darrf6=lar6c-lrf6c
-darrf12=lar12c-lrf12c
+load("ADL/adl_rolling_fixed_h6.RData")
+adl_bench_6c <- res_fixed
+rm(res_fixed)
 
-#Create ts object containing loss differentials
-dtarrf.ts=ts(cbind(darrf1,darrf3,darrf6,darrf12), start=c(2001,1), end=c(2015,12), freq=12)
-colnames(dtarrf.ts)=c("1-step dt","3-step dt","6-step dt","12-step dt")
-#Plot them to examine stationarity:
-plot.ts(dtarrf.ts, main="Loss differential AR-RF",cex.axis=1.8)
+load("ADL/adl_rolling_fixed_h12.RData")
+adl_bench_12c <- res_fixed
+rm(res_fixed)
 
-# RF-AR DM regressions
+load("ADL/adl_rolling_maf_h1.RData")
+adl_maf_1c <- res_maf
+rm(res_maf)
 
-#Regress d_t (AR-RF) for 1-step forecasts on a constant - get estimate of mean(d_t)
-dmarrf1=lm(darrf1~1) #regression
-acf(dmarrf1$residuals) #check serial correlation of residuals - number of significant autocorrelations is a good guess for number lags included in the HAC variance estimator
-dmarrf1$coefficients/sqrt(NeweyWest(dmarrf1,lag=5)) #form the DM t-statistic
+load("ADL/adl_rolling_maf_h3.RData")
+adl_maf_3c <- res_maf
+rm(res_maf)
 
-#3-step forecast test
-dmarrf3=lm(darrf3~1)
-acf(dmarrf3$residuals)
-dmarrf3$coefficients/sqrt(NeweyWest(dmarrf3,lag=5))
+load("ADL/adl_rolling_maf_h6.RData")
+adl_maf_6c <- res_maf
+rm(res_maf)
 
-#6-step forecast test
-dmarrf6=lm(darrf6~1)
-acf(dmarrf6$residuals)
-dmarrf6$coefficients/sqrt(NeweyWest(dmarrf6,lag=5))
+load("ADL/adl_rolling_maf_h12.RData")
+adl_maf_12c <- res_maf
+rm(res_maf)
 
-#12-step forecast test
-dmarrf12=lm(darrf12~1)
-acf(dmarrf12$residuals)
-dmarrf12$coefficients/sqrt(NeweyWest(dmarrf12,lag=5))
+load("ADL/adl_rolling_marx_h1.RData")
+adl_marx_1c <- res_marx
+rm(res_marx)
+
+load("ADL/adl_rolling_marx_h3.RData")
+adl_marx_3c <- res_marx
+rm(res_marx)
+
+load("ADL/adl_rolling_marx_h6.RData")
+adl_marx_6c <- res_marx
+rm(res_marx)
+
+load("ADL/adl_rolling_marx_h12.RData")
+adl_marx_12c <- res_marx
+rm(res_marx)
+
+# LASSO     
+load("Lasso/lasso_h1.RData")   
+load("Lasso/lasso_h3.RData")
+load("Lasso/lasso_h6.RData")
+load("Lasso/lasso_h12.RData")
+load ("Lasso/maf_lasso_h1.RData") 
+load ("Lasso/maf_lasso_h3.RData")
+load ("Lasso/maf_lasso_h6.RData")
+load ("Lasso/maf_lasso_h12.RData")
+load ("Lasso/marx_lasso_h1.RData")
+load ("Lasso/marx_lasso_h3.RData")
+load ("Lasso/marx_lasso_h6.RData")
+load ("Lasso/marx_lasso_h12.RData")
+
+# RF
+load("Tree/rf_h1.RData")   
+load("Tree/rf_h3.RData")
+load("Tree/rf_h6.RData")
+load("Tree/rf_h12.RData")
+load("Tree/maf_rf_h1.RData")   
+load("Tree/maf_rf_h3.RData")
+load("Tree/maf_rf_h6.RData")
+load("Tree/maf_rf_h12.RData")
+load("Tree/marx_rf_h1.RData")
+load("Tree/marx_rf_h3.RData")
+load("Tree/marx_rf_h6.RData")
+load("Tree/marx_rf_h12.RData")
+
+# Hybrid
+# load("hybrid.RData")             
+# load("hybrid_maf.RData")
+# load("hybrid_marx.RData")
+
+# Wrapper Function: Run full DM test for one model vs AR
+
+run_dm_test_vs_ar <- function(model_name, loss_ar, loss_model, plot_results = TRUE) {
+  
+  # Horizons
+  horizons <- c("1c", "3c", "6c", "12c")
+  horizon_names <- c("1-step", "3-step", "6-step", "12-step")
+  
+  # Storage for results
+  dm_stats <- numeric(4)
+  dm_objects <- list()
+  loss_diffs <- list()
+  
+  # Loop through horizons
+  for (i in 1:4) {
+    h <- horizons[i]
+    
+    # Compute loss differential (AR - Model)
+    loss_diff <- loss_ar[[h]] - loss_model[[h]]
+    loss_diffs[[h]] <- loss_diff
+    
+    # DM regression
+    dm_reg <- lm(loss_diff ~ 1)
+    dm_objects[[h]] <- dm_reg
+    
+    # Check ACF
+    acf(dm_reg$residuals, main = paste(model_name, horizon_names[i]))
+    
+    # Compute DM statistic
+    dm_stat <- as.numeric(dm_reg$coefficients / sqrt(NeweyWest(dm_reg, lag = 5)))
+    dm_stats[i] <- dm_stat
+    
+    # Print result
+    cat(sprintf("%s vs AR - %s: DM = %.3f\n", model_name, horizon_names[i], dm_stat))
+  }
+  
+  # Create plot - PAD shorter series with NA
+  if (plot_results) {
+    max_len <- max(sapply(loss_diffs, length))
+    
+    # Pad each series to max length
+    loss_diff_list <- lapply(loss_diffs, function(x) {
+      c(rep(NA, max_len - length(x)), x)  # Pad at the beginning with NA
+    })
+    
+    loss_diff_matrix <- do.call(cbind, loss_diff_list)
+    colnames(loss_diff_matrix) <- horizon_names
+    
+    # Convert to time series object with dates
+    loss_diff_ts <- ts(loss_diff_matrix, start = c(2010, 1), end = c(2019, 12), frequency = 12)
+    
+    plot.ts(loss_diff_ts, main = paste("Loss differential: AR -", model_name), 
+            cex.axis = 1.2, nc = 2, xlab = "Year") 
+  }
+  
+  # Return results
+  return(list(
+    dm_stats = dm_stats,
+    dm_objects = dm_objects,
+    loss_diffs = loss_diffs
+  ))
+}
+
+# STEP 1: Compute ALL squared losses
+
+cat("\nComputing squared losses for all models...\n")
+
+Y = md
+yy=Y[, "UNRATE"] #get the y variable - unemployment rate
+n_total <- length(yy)
+nprev <- 120  #number of out-of-sample forecasts
+oos_start <- n_total - nprev + 1  # First OOS observation index
+
+# Create true values for each horizon
+oosy_1  <- yy[oos_start:n_total]              # 120 observations (h=1)
+oosy_3  <- yy[(oos_start+2):n_total]          # 118 observations (h=3)
+oosy_6  <- yy[(oos_start+5):n_total]          # 115 observations (h=6)
+oosy_12 <- yy[(oos_start+11):n_total]         # 109 observations (h=12)
+
+# Function to clean NA values from predictions 
+clean_pred <- function(pred_vector) {
+  # Remove leading NAs
+  first_valid <- which(!is.na(pred_vector))[1]
+  return(pred_vector[first_valid:length(pred_vector)])
+} 
+
+# AR - Benchmark
+loss_ar <- list(
+  "1c"  = (oosy_1 - clean_pred(bar1c$pred))^2,
+  "3c"  = (oosy_3 - clean_pred(bar3c$pred))^2,
+  "6c"  = (oosy_6 - clean_pred(bar6c$pred))^2,
+  "12c" = (oosy_12 - clean_pred(bar12c$pred))^2
+)
+# ADL Benchmark
+loss_adl_bench <- list(
+  "1c"  = (oosy_1 - adl_bench_1c$pred)^2,
+  "3c"  = (oosy_3 - adl_bench_3c$pred)^2,
+  "6c"  = (oosy_6 - adl_bench_6c$pred)^2,
+  "12c" = (oosy_12 - adl_bench_12c$pred)^2
+)
+
+# ADL MAF
+loss_adl_maf <- list(
+  "1c"  = (oosy_1 - adl_maf_1c$pred)^2,
+  "3c"  = (oosy_3 - adl_maf_3c$pred)^2,
+  "6c"  = (oosy_6 - adl_maf_6c$pred)^2,
+  "12c" = (oosy_12 - adl_maf_12c$pred)^2
+)
+
+# ADL MARX
+loss_adl_marx <- list(
+  "1c"  = (oosy_1 - adl_marx_1c$pred)^2,
+  "3c"  = (oosy_3 - adl_marx_3c$pred)^2,
+  "6c"  = (oosy_6 - adl_marx_6c$pred)^2,
+  "12c" = (oosy_12 - adl_marx_12c$pred)^2
+)
 
 
-#####################################################
-#Set up for the tests of LASSO vs. Random Forest
-#####################################################
+# LASSO Benchmark
+loss_lasso_bench <- list(
+  "1c"  = (oosy_1 - clean_pred(lasso1c$pred))^2,
+  "3c"  = (oosy_3 - clean_pred(lasso3c$pred))^2,
+  "6c"  = (oosy_6 - clean_pred(lasso6c$pred))^2,
+  "12c" = (oosy_12 - clean_pred(lasso12c$pred))^2
+)
 
-#Compute squared loss for different horizons (LASSO)
-l1c=(oosy-lasso1c$pred)^2
-l3c=(oosy-lasso3c$pred)^2
-l6c=(oosy-lasso6c$pred)^2
-l12c=(oosy-lasso12c$pred)^2
+# LASSO MAF
+loss_lasso_maf <- list(
+  "1c"  = (oosy_1 - clean_pred(maf_lasso1c$pred))^2,
+  "3c"  = (oosy_3 - clean_pred (maf_lasso3c$pred))^2,
+  "6c"  = (oosy_6 - clean_pred (maf_lasso6c$pred))^2,
+  "12c" = (oosy_12 - clean_pred(maf_lasso12c$pred))^2
+)
 
-#Compute loss differentials (d_t) for different horizons (LASSO-RF)
-dplrf1=l1c-lrf1c
-dplrf3=l3c-lrf3c
-dplrf6=l6c-lrf6c
-dplrf12=l12c-lrf12c
+# LASSO MARX
+loss_lasso_marx <- list(
+  "1c"  = (oosy_1 - clean_pred(marx_lasso1c$pred))^2,
+  "3c"  = (oosy_3 - clean_pred(marx_lasso3c$pred))^2,
+  "6c"  = (oosy_6 - clean_pred(marx_lasso6c$pred))^2,
+  "12c" = (oosy_12 - clean_pred(marx_lasso12c$pred))^2
+)
 
-#Create ts object containing loss differentials
-dtplrf.ts=ts(cbind(dplrf1,dplrf3,dplrf6,dplrf12), start=c(2001,1), end=c(2015,12), freq=12)
-#Plot them to examine stationarity:
-colnames(dtplrf.ts)=c("1-step dt","3-step dt","6-step dt","12-step dt")
-plot.ts(dtplrf.ts, main="Loss differential PLASSO-RF",cex.axis=1.8)
+# RF Benchmark
+loss_rf_bench <- list(
+  "1c"  = (oosy_1 - clean_pred(rf12c$pred))^2,
+  "3c"  = (oosy_3 - clean_pred(rf32c$pred))^2,
+  "6c"  = (oosy_6 - clean_pred(rf62c$pred))^2,
+  "12c" = (oosy_12 - clean_pred(rf122c$pred))^2
+)
 
-#LASSO-RF DM regressions
+# RF MAF
+loss_rf_maf <- list(
+  "1c"  = (oosy_1 - clean_pred(maf_rf1$pred))^2,
+  "3c"  = (oosy_3 - clean_pred(maf_rf3$pred))^2,
+  "6c"  = (oosy_6 - clean_pred(maf_rf6$pred))^2,
+  "12c" = (oosy_12 - clean_pred(maf_rf12$pred))^2
+)
 
-#1-step forecast test
-dmplrf1=lm(dplrf1~1)
-acf(dmplrf1$residuals)
-dmplrf1$coefficients/sqrt(NeweyWest(dmplrf1,lag=5))
+# RF MARX
+loss_rf_marx <- list(
+  "1c"  = (oosy_1 - clean_pred(marx_rf1$pred))^2,
+  "3c"  = (oosy_3 - clean_pred((marx_rf3$pred)))^2,
+  "6c"  = (oosy_6 - clean_pred(marx_rf6$pred))^2,
+  "12c" = (oosy_12 - clean_pred(marx_rf12$pred))^2
+)
 
-#3-step forecast test
-dmplrf3=lm(dplrf3~1)
-acf(dmplrf3$residuals)
-dmplrf3$coefficients/sqrt(NeweyWest(dmplrf3,lag=5))
-
-#6-step forecast test
-dmplrf6=lm(dplrf6~1)
-acf(dmplrf6$residuals)
-dmplrf6$coefficients/sqrt(NeweyWest(dmplrf6,lag=5))
-
-#12-step forecast test
-dmplrf12=lm(dplrf12~1)
-acf(dmplrf12$residuals)
-dmplrf12$coefficients/sqrt(NeweyWest(dmplrf12,lag=5))
-
-#####################################################
-# Set up for the tests of LASSO vs. AR
-#####################################################
-
-# Compute squared loss for different horizons (LASSO)
-l1c  <- (oosy - lasso1c$pred)^2
-l3c  <- (oosy - lasso3c$pred)^2
-l6c  <- (oosy - lasso6c$pred)^2
-l12c <- (oosy - lasso12c$pred)^2
-
-# Compute squared loss for different horizons (AR)
-lar1c  <- (oosy - bar1c$pred)^2
-lar3c  <- (oosy - bar3c$pred)^2
-lar6c  <- (oosy - bar6c$pred)^2
-lar12c <- (oosy - bar12c$pred)^2
-
-# Compute loss differentials (d_t) for different horizons (LASSO - AR)
-dlassoar1  <- l1c  - lar1c
-dlassoar3  <- l3c  - lar3c
-dlassoar6  <- l6c  - lar6c
-dlassoar12 <- l12c - lar12c
-
-# Create ts object containing loss differentials
-dtlassoar.ts <- ts(cbind(dlassoar1, dlassoar3, dlassoar6, dlassoar12),
-                   start = c(2001, 1), end = c(2015, 12), freq = 12)
-colnames(dtlassoar.ts) <- c("1-step dt", "3-step dt", "6-step dt", "12-step dt")
-
-# Plot to inspect stationarity
-plot.ts(dtlassoar.ts, main = "Loss differential LASSO-AR", cex.axis = 1.8)
-
-#####################################################
-# DM regressions (LASSO vs AR)
-#####################################################
-
-# 1-step forecast test
-dmlassoar1 <- lm(dlassoar1 ~ 1)
-acf(dmlassoar1$residuals)
-dmlassoar1$coefficients / sqrt(NeweyWest(dmlassoar1, lag = 5))
-
-# 3-step forecast test
-dmlassoar3 <- lm(dlassoar3 ~ 1)
-acf(dmlassoar3$residuals)
-dmlassoar3$coefficients / sqrt(NeweyWest(dmlassoar3, lag = 5))
-
-# 6-step forecast test
-dmlassoar6 <- lm(dlassoar6 ~ 1)
-acf(dmlassoar6$residuals)
-dmlassoar6$coefficients / sqrt(NeweyWest(dmlassoar6, lag = 5))
-
-# 12-step forecast test
-dmlassoar12 <- lm(dlassoar12 ~ 1)
-acf(dmlassoar12$residuals)
-dmlassoar12$coefficients / sqrt(NeweyWest(dmlassoar12, lag = 5))
-
-#####################################################
-# Set up for the tests of ADL vs. AR
-#####################################################
-
-# Compute squared loss for different horizons (ADL)
-ladl1c  <- (oosy - adl1c$pred)^2
-ladl3c  <- (oosy - adl3c$pred)^2
-ladl6c  <- (oosy - adl6c$pred)^2
-ladl12c <- (oosy - adl12c$pred)^2
-
-# Compute squared loss for different horizons (AR)  [already defined above: lar1c..lar12c]
-
-# Compute loss differentials (ADL - AR)
-dadlar1  <- ladl1c  - lar1c
-dadlar3  <- ladl3c  - lar3c
-dadlar6  <- ladl6c  - lar6c
-dadlar12 <- ladl12c - lar12c
-
-# Create ts object containing loss differentials
-dtadlar.ts <- ts(cbind(dadlar1, dadlar3, dadlar6, dadlar12),
-                 start = c(2001, 1), end = c(2015, 12), freq = 12)
-colnames(dtadlar.ts) <- c("1-step dt", "3-step dt", "6-step dt", "12-step dt")
-
-# Plot to inspect stationarity
-plot.ts(dtadlar.ts, main = "Loss differential ADL-AR", cex.axis = 1.8)
-
-# DM regressions (ADL vs AR)
-dmadlar1  <- lm(dadlar1  ~ 1);  acf(dmadlar1$residuals)
-dmadlar3  <- lm(dadlar3  ~ 1);  acf(dmadlar3$residuals)
-dmadlar6  <- lm(dadlar6  ~ 1);  acf(dmadlar6$residuals)
-dmadlar12 <- lm(dadlar12 ~ 1);  acf(dmadlar12$residuals)
-
-dmadlar1$coefficients  / sqrt(NeweyWest(dmadlar1,  lag = 5))
-dmadlar3$coefficients  / sqrt(NeweyWest(dmadlar3,  lag = 5))
-dmadlar6$coefficients  / sqrt(NeweyWest(dmadlar6,  lag = 5))
-dmadlar12$coefficients / sqrt(NeweyWest(dmadlar12, lag = 5))
+# Hybrid
+#loss_hybrid <- list(
+#  "1c"  = (oosy_1 - hybrid1c$pred)^2,
+#  "3c"  = (oosy_3 - hybrid3c$pred)^2,
+#  "6c"  = (oosy_6 - hybrid6c$pred)^2,
+#  "12c" = (oosy_12 - hybrid12c$pred)^2
+#)
 
 
-#####################################################
-# Set up for the tests of ADL vs. RF
-#####################################################
+# STEP 2: Run DM tests for all models vs AR
+# Run tests
+cat("\n--- ADL Models ---\n")
+dm_adl_bench <- run_dm_test_vs_ar("ADL Benchmark", loss_ar, loss_adl_bench)
+dm_adl_maf   <- run_dm_test_vs_ar("ADL MAF", loss_ar, loss_adl_maf)
+dm_adl_marx  <- run_dm_test_vs_ar("ADL MARX", loss_ar, loss_adl_marx)
 
-# Compute squared loss for different horizons (ADL)  [already defined just above: ladl1c..ladl12c]
-# Compute squared loss for different horizons (RF)   [already defined above: lrf1c..lrf12c]
+cat("\n--- LASSO Models ---\n")
+dm_lasso_bench <- run_dm_test_vs_ar("LASSO Benchmark", loss_ar, loss_lasso_bench)
+dm_lasso_maf   <- run_dm_test_vs_ar("LASSO MAF", loss_ar, loss_lasso_maf)
+dm_lasso_marx  <- run_dm_test_vs_ar("LASSO MARX", loss_ar, loss_lasso_marx)
 
-# Compute loss differentials (ADL - RF)
-dadlrf1  <- ladl1c  - lrf1c
-dadlrf3  <- ladl3c  - lrf3c
-dadlrf6  <- ladl6c  - lrf6c
-dadlrf12 <- ladl12c - lrf12c 
+cat("\n--- RF Models ---\n")
+dm_rf_bench <- run_dm_test_vs_ar("RF Benchmark", loss_ar, loss_rf_bench)
+dm_rf_maf   <- run_dm_test_vs_ar("RF MAF", loss_ar, loss_rf_maf)
+dm_rf_marx  <- run_dm_test_vs_ar("RF MARX", loss_ar, loss_rf_marx)
 
-# Create ts object containing loss differentials
-dtadlrf.ts <- ts(cbind(dadlrf1, dadlrf3, dadlrf6, dadlrf12),
-                 start = c(2001, 1), end = c(2015, 12), freq = 12)
-colnames(dtadlrf.ts) <- c("1-step dt", "3-step dt", "6-step dt", "12-step dt")
+cat("\n--- Hybrid Models ---\n")
+dm_hybrid_bench <- run_dm_test_vs_ar("Hybrid Benchmark", loss_ar, loss_hybrid_bench)
+dm_hybrid_maf   <- run_dm_test_vs_ar("Hybrid MAF", loss_ar, loss_hybrid_maf)
+dm_hybrid_marx  <- run_dm_test_vs_ar("Hybrid MARX", loss_ar, loss_hybrid_marx)
 
-# Plot to inspect stationarity
-plot.ts(dtadlrf.ts, main = "Loss differential ADL-RF", cex.axis = 1.8)
 
-# DM regressions (ADL vs RF)
-dmadlrf1  <- lm(dadlrf1  ~ 1);  acf(dmadlrf1$residuals)
-dmadlrf3  <- lm(dadlrf3  ~ 1);  acf(dmadlrf3$residuals)
-dmadlrf6  <- lm(dadlrf6  ~ 1);  acf(dmadlrf6$residuals)
-dmadlrf12 <- lm(dadlrf12 ~ 1);  acf(dmadlrf12$residuals)
+# STEP 3: Collect results into 4×12 matrix
 
-dmadlrf1$coefficients  / sqrt(NeweyWest(dmadlrf1,  lag = 5))
-dmadlrf3$coefficients  / sqrt(NeweyWest(dmadlrf3,  lag = 5))
-dmadlrf6$coefficients  / sqrt(NeweyWest(dmadlrf6,  lag = 5))
-dmadlrf12$coefficients / sqrt(NeweyWest(dmadlrf12, lag = 5))
+dm_results <- matrix(NA, nrow = 4, ncol = 12)
+colnames(dm_results) <- c("ADL_Bench", "ADL_MAF", "ADL_MARX", 
+                          "LASSO_Bench", "LASSO_MAF", "LASSO_MARX",
+                          "RF_Bench", "RF_MAF", "RF_MARX", 
+                          "Hybrid_Bench", "Hybrid_MAF", "Hybrid_MARX")
+rownames(dm_results) <- c("1-step", "3-step", "6-step", "12-step")
 
-#####################################################
-# Set up for the tests of LASSO vs. ADL
-#####################################################
+# Fill in results
+dm_results[, 1]  <- dm_adl_bench$dm_stats
+dm_results[, 2]  <- dm_adl_maf$dm_stats
+dm_results[, 3]  <- dm_adl_marx$dm_stats
+dm_results[, 4]  <- dm_lasso_bench$dm_stats
+dm_results[, 5]  <- dm_lasso_maf$dm_stats
+dm_results[, 6]  <- dm_lasso_marx$dm_stats
+dm_results[, 7]  <- dm_rf_bench$dm_stats
+dm_results[, 8]  <- dm_rf_maf$dm_stats
+dm_results[, 9]  <- dm_rf_marx$dm_stats
+dm_results[, 10] <- dm_hybrid_bench$dm_stats
+dm_results[, 11] <- dm_hybrid_maf$dm_stats
+dm_results[, 12] <- dm_hybrid_marx$dm_stats
 
-# Compute squared loss for different horizons (LASSO) [already defined above: l1c..l12c]
-# Compute squared loss for different horizons (ADL)   [already defined above: ladl1c..ladl12c]
 
-# Compute loss differentials (LASSO - ADL)
-dlassoadl1  <- l1c  - ladl1c
-dlassoadl3  <- l3c  - ladl3c
-dlassoadl6  <- l6c  - ladl6c
-dlassoadl12 <- l12c - ladl12c
+# STEP 4: Compute p-values
 
-# Create ts object containing loss differentials
-dtlassoadl.ts <- ts(cbind(dlassoadl1, dlassoadl3, dlassoadl6, dlassoadl12),
-                    start = c(2001, 1), end = c(2015, 12), freq = 12)
-colnames(dtlassoadl.ts) <- c("1-step dt", "3-step dt", "6-step dt", "12-step dt")
+p_results <- 2 * (1 - pnorm(abs(dm_results)))
+colnames(p_results) <- colnames(dm_results)
+rownames(p_results) <- rownames(dm_results)
 
-# Plot to inspect stationarity
-plot.ts(dtlassoadl.ts, main = "Loss differential LASSO-ADL", cex.axis = 1.8)
 
-# DM regressions (LASSO vs ADL)
-dmlassoadl1  <- lm(dlassoadl1  ~ 1);  acf(dmlassoadl1$residuals)
-dmlassoadl3  <- lm(dlassoadl3  ~ 1);  acf(dmlassoadl3$residuals)
-dmlassoadl6  <- lm(dlassoadl6  ~ 1);  acf(dmlassoadl6$residuals)
-dmlassoadl12 <- lm(dlassoadl12 ~ 1);  acf(dmlassoadl12$residuals)
+# STEP 5: Create formatted table with significance stars
 
-dmlassoadl1$coefficients  / sqrt(NeweyWest(dmlassoadl1,  lag = 5))
-dmlassoadl3$coefficients  / sqrt(NeweyWest(dmlassoadl3,  lag = 5))
-dmlassoadl6$coefficients  / sqrt(NeweyWest(dmlassoadl6,  lag = 5))
-dmlassoadl12$coefficients / sqrt(NeweyWest(dmlassoadl12, lag = 5))
+format_dm <- function(dm_stat, p_val) {
+  if (is.na(dm_stat)) return("—")
+  
+  sig <- ""
+  if (p_val < 0.01) sig <- "***"
+  else if (p_val < 0.05) sig <- "**"
+  else if (p_val < 0.10) sig <- "*"
+  
+  return(paste0(sprintf("%.2f", dm_stat), sig))
+}
+
+dm_formatted <- matrix(NA, nrow = 4, ncol = 12)
+for (i in 1:4) {
+  for (j in 1:12) {
+    dm_formatted[i, j] <- format_dm(dm_results[i, j], p_results[i, j])
+  }
+}
+colnames(dm_formatted) <- colnames(dm_results)
+rownames(dm_formatted) <- rownames(dm_results)
+
+
+# STEP 6: Display results
+
+cat("DM T-STATISTICS:\n")
+print(round(dm_results, 3))
+
+cat("\n\nP-VALUES:\n\n")
+print(round(p_results, 4))
+
+cat("Note: *** p<0.01, ** p<0.05, * p<0.10\n\n")
+print(dm_formatted, quote = FALSE)
+
+
+# STEP 7: Summary Statistics
+
+# Count significant wins at each level
+sig_01 <- sum(p_results < 0.01, na.rm = TRUE)
+sig_05 <- sum(p_results < 0.05, na.rm = TRUE)
+sig_10 <- sum(p_results < 0.10, na.rm = TRUE)
+
+cat("Significant improvements over AR(P):\n")
+cat("  At 1% level (***): ", sig_01, " out of 48 tests\n")
+cat("  At 5% level (**):  ", sig_05, " out of 48 tests\n")
+cat("  At 10% level (*):  ", sig_10, " out of 48 tests\n\n")
+
+# Best model by horizon
+cat("Best performing model by horizon:\n")
+for (i in 1:4) {
+  best_idx <- which.max(dm_results[i, ])
+  best_model <- colnames(dm_results)[best_idx]
+  best_stat <- dm_results[i, best_idx]
+  best_pval <- p_results[i, best_idx]
+  
+  cat("  ", rownames(dm_results)[i], ": ", best_model, 
+      " (DM=", round(best_stat, 2), ", p=", round(best_pval, 4), ")\n", sep="")
+}
+
+# Overall best model (across all horizons)
+cat("\nOverall best model (highest average DM statistic):\n")
+avg_dm <- colMeans(dm_results)
+best_overall <- which.max(avg_dm)
+cat("  ", names(avg_dm)[best_overall], " (Avg DM=", round(avg_dm[best_overall], 2), ")\n", sep="")
