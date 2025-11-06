@@ -2,9 +2,9 @@
 # Run function for hybrid method (rLASSO + RF)
 # Expects a data matrix X as well as desired lags for Y and X, and options for maf and marx
 # ------------------------------------------
-runhybrid_maf <- function(X, h=1, L_y=4, target_name="UNRATE"){
-    L_y <- 4
-    P_maf <- 4 # number of MAF lags
+runhybrid_maf <- function(X, h=1, L_y=4, P_maf=4, target_name="UNRATE"){
+    L_y <- L_y
+    P_maf <- P_maf
     # Initial data cleaning
     X <- subset(X, select= -date) # remove date column if present
     X_in  <- X[-nrow(X), , drop=FALSE]
@@ -123,7 +123,7 @@ runhybrid_maf <- function(X, h=1, L_y=4, target_name="UNRATE"){
     )
 }
 
-hybrid_maf.rolling.window <- function(X, nprev, h=1, target_name = "UNRATE") {
+hybrid_maf.rolling.window <- function(X, nprev, h=1, P_maf=4, target_name = "UNRATE") {
     # Set up default variables 
     save.pred <- rep(NA_real_, nprev)
     save.pca      <- vector("list", nprev)
@@ -133,7 +133,7 @@ hybrid_maf.rolling.window <- function(X, nprev, h=1, target_name = "UNRATE") {
 
     for (i in nprev:max(h,1)) {
         X.window <- X[(1 + nprev - i):(nrow(X) - i), , drop = FALSE]
-        fitobj <- runhybrid_maf(X.window, h = h, target_name = target_name)
+        fitobj <- runhybrid_maf(X.window, h = h, P_maf = P_maf, target_name = target_name)
 
         t  <- nrow(X) - i
         u  <- t + h
@@ -147,7 +147,7 @@ hybrid_maf.rolling.window <- function(X, nprev, h=1, target_name = "UNRATE") {
             save.lasso.coef[[pos]] <- lasso.cf
             
         }
-        cat("iteration", pos, "\n")
+        cat("Completed iteration", pos, "of", nprev, "\n")
     }
 
     real <- X[, which(colnames(X) == target_name)]

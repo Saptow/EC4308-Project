@@ -6,7 +6,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Load library
 # Assume working directory is at root of repo
 library(dplyr)
-source('./ADL/func-adl.R')
+source('./ADL/func-adl-pca.R')
 
 # =============================================================================
 ## For our simple ARDL benchmark, we will be using term spread and yield spread
@@ -42,25 +42,25 @@ nprev=120
 # Define horizon windows (in months)
 horizon_windows=c(1,3,6,12)
 
-# Option 1: Run using BIC 
-for (h in horizon_windows){
-  print(paste0("Running horizon: ", h))
-  res_bic=ardl.rolling.window(
-    Y = Y,
-    X = X,
-    nprev = nprev,
-    indice = 1, # UNRATE col in Y
-    h = h,
-    type = "bic",
-    p_max = 4,
-    p_fixed=4,
-    q_max = 4,
-    use_x0 = TRUE,
-    verbose = TRUE,
-    search_mode="q"
-  )
-  save(res_bic, file = paste0("./ADL/adl_rolling_bic_h", h, ".RData"))
-}
+# # Option 1: Run using BIC 
+# for (h in horizon_windows){
+#   print(paste0("Running horizon: ", h))
+#   res_bic=ardl.rolling.window(
+#     Y = Y,
+#     X = X,
+#     nprev = nprev,
+#     indice = 1, # UNRATE col in Y
+#     h = h,
+#     type = "bic",
+#     p_max = 4,
+#     p_fixed=4,
+#     q_max = 4,
+#     use_x0 = TRUE,
+#     verbose = TRUE,
+#     search_mode="q"
+#   )
+#   save(res_bic, file = paste0("./ADL/adl_rolling_bic_h", h, ".RData"))
+# }
 
 # Option 2: Run fixed
 for (h in horizon_windows){
@@ -75,9 +75,10 @@ for (h in horizon_windows){
     p_fixed = 4,
     q_fixed = 4,
     use_x0 = TRUE,
-    verbose = TRUE
+    x_dimred = "pca",
+    pca_var = 0.90
   )
-  save(res_fixed, file = paste0("./ADL/adl_rolling_fixed_h", h, ".RData"))
+  save(res_fixed, file = paste0("./ADL/pca_adl_rolling_fixed_h", h, ".RData"))
 }
 
 # Option 3: Run using MAF
@@ -90,56 +91,49 @@ for (h in horizon_windows){
     indice = 1, # UNRATE col in Y
     h = h,
     type = "maf",
-    p_max = 4,
     p_fixed=4,
-    q_max = 4,
     use_x0 = TRUE,
-    verbose = TRUE,
-    P_maf = 4
+    P_maf = 4,
+    x_dimred = "pca",
+    pca_var = 0.90
   )
-  save(res_maf, file = paste0("./ADL/adl_rolling_maf_h", h, ".RData"))
+  save(res_maf, file = paste0("./ADL/pca_adl_rolling_maf_h", h, ".RData"))
 }
 
 # Option 4: Run using MARX
 for (h in horizon_windows){
-     print(paste0("Running horizon: ", h))
-     res_marx=ardl.rolling.window(
-     Y = Y,
-     X = X,
-     nprev = nprev,
-     indice = 1, # UNRATE col in Y
-     h = h,
-     type = "marx",
-     p_max = 4,
-     p_fixed=4,
-     q_max = 4,
-     use_x0 = TRUE,
-     verbose = TRUE,
-     marx_q = 4
+      print(paste0("Running horizon: ", h))
+      res_marx=ardl.rolling.window(
+      Y = Y,
+      X = X,
+      nprev = nprev,
+      indice = 1, # UNRATE col in Y
+      h = h,
+      type = "marx",
+      p_fixed=4,
+      use_x0 = TRUE,
+      marx_q = 4,
+      x_dimred = "pca",
+      pca_var = 0.90
      )
-     save(res_marx, file = paste0("./ADL/adl_rolling_marx_h", h, ".RData"))
+     save(res_marx, file = paste0("./ADL/pca_adl_rolling_marx_h", h, ".RData"))
      }
 
 # Load all results
-res_bic1 <- get(load("./ADL/adl_rolling_bic_h1.RData"))
-res_bic3 <- get(load("./ADL/adl_rolling_bic_h3.RData"))
-res_bic6 <- get(load("./ADL/adl_rolling_bic_h6.RData"))
-res_bic12 <- get(load("./ADL/adl_rolling_bic_h12.RData"))
+res_fixed1 <- get(load("./ADL/pca_adl_rolling_fixed_h1.RData"))
+res_fixed3 <- get(load("./ADL/pca_adl_rolling_fixed_h3.RData"))
+res_fixed6 <- get(load("./ADL/pca_adl_rolling_fixed_h6.RData"))
+res_fixed12 <- get(load("./ADL/pca_adl_rolling_fixed_h12.RData"))
 
-res_fixed1 <- get(load("./ADL/adl_rolling_fixed_h1.RData"))
-res_fixed3 <- get(load("./ADL/adl_rolling_fixed_h3.RData"))
-res_fixed6 <- get(load("./ADL/adl_rolling_fixed_h6.RData"))
-res_fixed12 <- get(load("./ADL/adl_rolling_fixed_h12.RData"))
+res_maf1 <- get(load("./ADL/pca_adl_rolling_maf_h1.RData"))
+res_maf3 <- get(load("./ADL/pca_adl_rolling_maf_h3.RData"))
+res_maf6 <- get(load("./ADL/pca_adl_rolling_maf_h6.RData"))
+res_maf12 <- get(load("./ADL/pca_adl_rolling_maf_h12.RData"))
 
-res_maf1 <- get(load("./ADL/adl_rolling_maf_h1.RData"))
-res_maf3 <- get(load("./ADL/adl_rolling_maf_h3.RData"))
-res_maf6 <- get(load("./ADL/adl_rolling_maf_h6.RData"))
-res_maf12 <- get(load("./ADL/adl_rolling_maf_h12.RData"))
-
-res_marx1 <- get(load("./ADL/adl_rolling_marx_h1.RData"))
-res_marx3 <- get(load("./ADL/adl_rolling_marx_h3.RData"))
-res_marx6 <- get(load("./ADL/adl_rolling_marx_h6.RData"))   
-res_marx12 <- get(load("./ADL/adl_rolling_marx_h12.RData"))
+res_marx1 <- get(load("./ADL/pca_adl_rolling_marx_h1.RData"))
+res_marx3 <- get(load("./ADL/pca_adl_rolling_marx_h3.RData"))
+res_marx6 <- get(load("./ADL/pca_adl_rolling_marx_h6.RData"))   
+res_marx12 <- get(load("./ADL/pca_adl_rolling_marx_h12.RData"))
 
 # Helper: plot ARDL benchmark for a given horizon
 plot_ardl_bench <- function(res_bic, res_fixed, res_maf, res_marx, real,
