@@ -161,18 +161,8 @@ runARDL <- function(Y, X = NULL, indice = 1,
 
   if (type == "maf") {
     source("./data_transformation/maf_transform.R")
-    cat(ncol(X), "columns in X before MAF transformation.\n")
-    # check if dummy exists
-    if (!dummy_name %in% colnames(X)) {
-      stop(paste0("Dummy variable '", dummy_name, "' not found in X for MAF transformation."))
-    }
     dum <- X[, dummy_name, drop = FALSE]
     X_wo <- X[, colnames(X) != dummy_name, drop = FALSE]
-    # Print details about X_wo
-    cat(sprintf("MAF X_wo dimensions: %d rows, %d cols\n",
-                nrow(X_wo), ncol(X_wo)))
-
-    # Check for all numeric
     X_maf <- maf_transform(X_wo, P_maf = P_maf, scale_data = TRUE)
     dum_aligned <- dum[-seq_len(P_maf - 1), , drop = FALSE]
     X_maf  <- cbind(tmp_dummy = dum_aligned[,1], X_maf)
