@@ -45,8 +45,7 @@ for (h in horizon_windows){
     p_fixed = 4,
     q_fixed = 4,
     use_x0 = TRUE,
-    x_dimred = "pca",
-    pca_var = 0.90
+    x_dimred = "pca"
   )
   save(res_fixed, file = paste0("./ADL/pca_adl_rolling_fixed_h", h, ".RData"))
 }

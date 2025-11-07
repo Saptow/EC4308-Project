@@ -10,27 +10,6 @@ pad_top_na <- function(M, target_n) {
   colnames(pad) <- colnames(M)
   rbind(pad, M)
 }
-# Clean X for PCA: remove all-NA cols, replace non-finite with col means, drop zero-variance cols
-clean_for_pca <- function(X) {
-  if (is.null(X) || !ncol(X)) return(X)
-  # Drop all-NA columns
-  X <- X[, colSums(is.finite(as.matrix(X))) > 0, drop = FALSE]
-  if (!ncol(X)) return(X)
-  # Replace non-finite values with column means
-  X[] <- lapply(X, function(v) {
-    v[!is.finite(v)] <- mean(v[is.finite(v)], na.rm = TRUE)
-    v
-  })
-  # Drop zero-variance columns
-  keep <- apply(X, 2, function(v) sd(v, na.rm = TRUE) > 0)
-  X[, keep, drop = FALSE]
-  # echo dropped columns
-  if (any(!keep)) {
-    dropped <- colnames(X)[!keep]
-    cat(paste0("Dropped zero-variance columns for PCA: ", paste(dropped, collapse = ", ")))
-    cat("\n")
-  }
-}
 
 make_design <- function(y_raw, X, p, q, h, 
                         dummy_name = "aft_break",
@@ -56,13 +35,12 @@ make_design <- function(y_raw, X, p, q, h,
   # X block
   if (!is.null(X)) {
     stopifnot(dummy_name %in% colnames(X))
-    if (q > 0) { # 
+    if (q > 0) { 
       dum_col <- X[, dummy_name, drop = FALSE]
       X_wo    <- X[, setdiff(colnames(X), dummy_name), drop = FALSE]
 
       if (x_dimred == "pca" && ncol(X_wo) > 0) {
         # Train PCA on the current window (center/scale)
-        X_wo <- clean_for_pca(X_wo)
         X_sc   <- scale(X_wo, center = TRUE, scale = TRUE)
         max_pc <- min(ncol(X_sc), nrow(X_sc) - 1)
         if (is.finite(max_pc) && max_pc >= 1) {
