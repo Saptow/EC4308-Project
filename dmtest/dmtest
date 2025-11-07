@@ -19,7 +19,7 @@ load("AR(p)/ar_h3.RData")
 load("AR(p)/ar_h6.RData")
 load("AR(p)/ar_h12.RData")
 
-# ADL
+# ADL rolling fixed (w/o PCA)
 load("ADL/adl_rolling_fixed_h1.RData")
 adl_bench_1c <- res_fixed
 rm(res_fixed)
@@ -36,36 +36,55 @@ load("ADL/adl_rolling_fixed_h12.RData")
 adl_bench_12c <- res_fixed
 rm(res_fixed)
 
-load("ADL/adl_rolling_maf_h1.RData")
-adl_maf_1c <- res_maf
+# ADL PCA Benchmark 
+load("ADL/pca_adl_rolling_fixed_h1.RData")
+adl_benchpca_1c <- res_fixed
+rm(res_fixed)
+
+load("ADL/pca_adl_rolling_fixed_h3.RData")
+adl_benchpca_3c <- res_fixed
+rm(res_fixed)
+
+load("ADL/pca_adl_rolling_fixed_h6.RData")
+adl_benchpca_6c <- res_fixed
+rm(res_fixed)
+
+load("ADL/pca_adl_rolling_fixed_h12.RData")
+adl_benchpca_12c <- res_fixed
+rm(res_fixed)
+
+# ADL PCA MAF 
+load("ADL/pca_adl_rolling_maf_h1.RData")
+adl_mafpca_1c <- res_maf 
 rm(res_maf)
 
-load("ADL/adl_rolling_maf_h3.RData")
-adl_maf_3c <- res_maf
+load("ADL/pca_adl_rolling_maf_h3.RData")
+adl_mafpca_3c <- res_maf 
 rm(res_maf)
 
-load("ADL/adl_rolling_maf_h6.RData")
-adl_maf_6c <- res_maf
+load("ADL/pca_adl_rolling_maf_h6.RData")
+adl_mafpca_6c <- res_maf 
 rm(res_maf)
 
-load("ADL/adl_rolling_maf_h12.RData")
-adl_maf_12c <- res_maf
+load("ADL/pca_adl_rolling_maf_h12.RData")
+adl_mafpca_12c <- res_maf 
 rm(res_maf)
 
-load("ADL/adl_rolling_marx_h1.RData")
-adl_marx_1c <- res_marx
+# ADL PCA MARX 
+load("ADL/pca_adl_rolling_marx_h1.RData")
+adl_marxpca_1c <- res_marx
 rm(res_marx)
 
-load("ADL/adl_rolling_marx_h3.RData")
-adl_marx_3c <- res_marx
+load("ADL/pca_adl_rolling_marx_h3.RData")
+adl_marxpca_3c <- res_marx
 rm(res_marx)
 
-load("ADL/adl_rolling_marx_h6.RData")
-adl_marx_6c <- res_marx
+load("ADL/pca_adl_rolling_marx_h6.RData")
+adl_marxpca_6c <- res_marx
 rm(res_marx)
 
-load("ADL/adl_rolling_marx_h12.RData")
-adl_marx_12c <- res_marx
+load("ADL/pca_adl_rolling_marx_h12.RData")
+adl_marxpca_12c <- res_marx
 rm(res_marx)
 
 # LASSO     
@@ -97,12 +116,55 @@ load("Tree/marx_rf_h6.RData")
 load("Tree/marx_rf_h12.RData")
 
 # Hybrid
-# load("hybrid.RData")             
-# load("hybrid_maf.RData")
-# load("hybrid_marx.RData")
+load("hybrid/hybrid_fit_h1.RData") 
+hybrid_bench_1c <- hybrid_fit
+rm(hybrid_fit)
 
-# Wrapper Function: Run full DM test for one model vs AR
+load("hybrid/hybrid_fit_h3.RData")
+hybrid_bench_3c <- hybrid_fit
+rm(hybrid_fit)
 
+load("hybrid/hybrid_fit_h6.RData")
+hybrid_bench_6c <- hybrid_fit
+rm(hybrid_fit)
+
+load("hybrid/hybrid_fit_h12.RData")
+hybrid_bench_12c <- hybrid_fit
+rm(hybrid_fit)
+
+load("hybrid/hybrid_maf_fit_h1.RData")
+hybrid_maf_1c <- hybrid_maf_fit
+rm(hybrid_maf_fit)
+
+load("hybrid/hybrid_maf_fit_h3.RData")
+hybrid_maf_3c <- hybrid_maf_fit
+rm(hybrid_maf_fit)
+
+load("hybrid/hybrid_maf_fit_h6.RData")
+hybrid_maf_6c <- hybrid_maf_fit
+rm(hybrid_maf_fit)
+
+load("hybrid/hybrid_maf_fit_h12.RData")
+hybrid_maf_12c <- hybrid_maf_fit
+rm(hybrid_maf_fit)
+
+load("hybrid/hybrid_marx_fit_h1.RData")
+hybrid_marx_1c <- hybrid_marx_fit
+rm(hybrid_marx_fit)
+
+load("hybrid/hybrid_marx_fit_h3.RData")
+hybrid_marx_3c <- hybrid_marx_fit
+rm(hybrid_marx_fit)
+
+load("hybrid/hybrid_marx_fit_h6.RData")
+hybrid_marx_6c <- hybrid_marx_fit
+rm(hybrid_marx_fit)
+
+load("hybrid/hybrid_marx_fit_h12.RData")
+hybrid_marx_12c <- hybrid_marx_fit
+rm(hybrid_marx_fit)
+
+# Wrapper Function 1: Run full DM test for model vs AR
 run_dm_test_vs_ar <- function(model_name, loss_ar, loss_model, plot_results = TRUE) {
   
   # Horizons
@@ -137,7 +199,7 @@ run_dm_test_vs_ar <- function(model_name, loss_ar, loss_model, plot_results = TR
     cat(sprintf("%s vs AR - %s: DM = %.3f\n", model_name, horizon_names[i], dm_stat))
   }
   
-  # Create plot - PAD shorter series with NA
+  # Create plot 
   if (plot_results) {
     max_len <- max(sapply(loss_diffs, length))
     
@@ -164,37 +226,84 @@ run_dm_test_vs_ar <- function(model_name, loss_ar, loss_model, plot_results = TR
   ))
 }
 
-# STEP 1: Compute ALL squared losses
+# Wrapper Function 1: Run full DM test for model vs ADL without PCA 
+run_dm_test_vs_adl <- function(model_name, loss_adl, loss_model, plot_results = TRUE) {
+  
+  horizons <- c("1c", "3c", "6c", "12c")
+  horizon_names <- c("1-step", "3-step", "6-step", "12-step")
+  
+  dm_stats <- numeric(4)
+  dm_objects <- list()
+  loss_diffs <- list()
+  
+  for (i in 1:4) {
+    h <- horizons[i]
+    
+    loss_diff <- loss_adl[[h]] - loss_model[[h]]
+    loss_diffs[[h]] <- loss_diff
+    
+    dm_reg <- lm(loss_diff ~ 1)
+    dm_objects[[h]] <- dm_reg
+    
+    acf(dm_reg$residuals, main = paste(model_name, horizon_names[i]))
+    
+    dm_stat <- as.numeric(dm_reg$coefficients / sqrt(NeweyWest(dm_reg, lag = 5)))
+    dm_stats[i] <- dm_stat
+    
+    cat(sprintf("%s vs ADL - %s: DM = %.3f\n", model_name, horizon_names[i], dm_stat))
+  }
+  
+  if (plot_results) {
+    max_len <- max(sapply(loss_diffs, length))
+    
+    loss_diff_list <- lapply(loss_diffs, function(x) {
+      c(rep(NA, max_len - length(x)), x)
+    })
+    
+    loss_diff_matrix <- do.call(cbind, loss_diff_list)
+    colnames(loss_diff_matrix) <- horizon_names
+    
+    loss_diff_ts <- ts(loss_diff_matrix, start = c(2010, 1), end = c(2019, 12), frequency = 12)
+    
+    plot.ts(loss_diff_ts, main = paste("Loss differential: ADL -", model_name), 
+            cex.axis = 1.2, nc = 2, xlab = "Year") 
+  }
+  
+  return(list(
+    dm_stats = dm_stats,
+    dm_objects = dm_objects,
+    loss_diffs = loss_diffs
+  ))
+}
 
-cat("\nComputing squared losses for all models...\n")
-
+# STEP 1: Prepare loss differentials for all models
 Y = md
-yy=Y[, "UNRATE"] #get the y variable - unemployment rate
+yy = Y[, "UNRATE"]
 n_total <- length(yy)
-nprev <- 120  #number of out-of-sample forecasts
-oos_start <- n_total - nprev + 1  # First OOS observation index
+nprev <- 120
+oos_start <- n_total - nprev + 1
 
-# Create true values for each horizon
-oosy_1  <- yy[oos_start:n_total]              # 120 observations (h=1)
-oosy_3  <- yy[(oos_start+2):n_total]          # 118 observations (h=3)
-oosy_6  <- yy[(oos_start+5):n_total]          # 115 observations (h=6)
-oosy_12 <- yy[(oos_start+11):n_total]         # 109 observations (h=12)
+# True values for each horizon
+oosy_1  <- yy[oos_start:n_total]
+oosy_3  <- yy[(oos_start+2):n_total]
+oosy_6  <- yy[(oos_start+5):n_total]
+oosy_12 <- yy[(oos_start+11):n_total]
 
-# Function to clean NA values from predictions 
+# Function to clean NA values
 clean_pred <- function(pred_vector) {
-  # Remove leading NAs
   first_valid <- which(!is.na(pred_vector))[1]
   return(pred_vector[first_valid:length(pred_vector)])
-} 
+}
 
-# AR - Benchmark
+# AR
 loss_ar <- list(
   "1c"  = (oosy_1 - clean_pred(bar1c$pred))^2,
   "3c"  = (oosy_3 - clean_pred(bar3c$pred))^2,
   "6c"  = (oosy_6 - clean_pred(bar6c$pred))^2,
   "12c" = (oosy_12 - clean_pred(bar12c$pred))^2
 )
-# ADL Benchmark
+
+# ADL (no PCA)
 loss_adl_bench <- list(
   "1c"  = (oosy_1 - adl_bench_1c$pred)^2,
   "3c"  = (oosy_3 - adl_bench_3c$pred)^2,
@@ -202,24 +311,31 @@ loss_adl_bench <- list(
   "12c" = (oosy_12 - adl_bench_12c$pred)^2
 )
 
-# ADL MAF
-loss_adl_maf <- list(
-  "1c"  = (oosy_1 - adl_maf_1c$pred)^2,
-  "3c"  = (oosy_3 - adl_maf_3c$pred)^2,
-  "6c"  = (oosy_6 - adl_maf_6c$pred)^2,
-  "12c" = (oosy_12 - adl_maf_12c$pred)^2
+# ADL PCA Benchmark
+loss_adl_benchpca <- list(
+  "1c"  = (oosy_1 - adl_benchpca_1c$pred)^2,
+  "3c"  = (oosy_3 - adl_benchpca_3c$pred)^2,
+  "6c"  = (oosy_6 - adl_benchpca_6c$pred)^2,
+  "12c" = (oosy_12 - adl_benchpca_12c$pred)^2
 )
 
-# ADL MARX
-loss_adl_marx <- list(
-  "1c"  = (oosy_1 - adl_marx_1c$pred)^2,
-  "3c"  = (oosy_3 - adl_marx_3c$pred)^2,
-  "6c"  = (oosy_6 - adl_marx_6c$pred)^2,
-  "12c" = (oosy_12 - adl_marx_12c$pred)^2
+# ADL MAF PCA
+loss_adl_mafpca <- list(
+  "1c"  = (oosy_1 - adl_mafpca_1c$pred)^2,
+  "3c"  = (oosy_3 - adl_mafpca_3c$pred)^2,
+  "6c"  = (oosy_6 - adl_mafpca_6c$pred)^2,
+  "12c" = (oosy_12 - adl_mafpca_12c$pred)^2
 )
 
+# ADL MARX PCA
+loss_adl_marxpca <- list(
+  "1c"  = (oosy_1 - adl_marxpca_1c$pred)^2,
+  "3c"  = (oosy_3 - adl_marxpca_3c$pred)^2,
+  "6c"  = (oosy_6 - adl_marxpca_6c$pred)^2,
+  "12c" = (oosy_12 - adl_marxpca_12c$pred)^2
+)
 
-# LASSO Benchmark
+# LASSO
 loss_lasso_bench <- list(
   "1c"  = (oosy_1 - clean_pred(lasso1c$pred))^2,
   "3c"  = (oosy_3 - clean_pred(lasso3c$pred))^2,
@@ -230,8 +346,8 @@ loss_lasso_bench <- list(
 # LASSO MAF
 loss_lasso_maf <- list(
   "1c"  = (oosy_1 - clean_pred(maf_lasso1c$pred))^2,
-  "3c"  = (oosy_3 - clean_pred (maf_lasso3c$pred))^2,
-  "6c"  = (oosy_6 - clean_pred (maf_lasso6c$pred))^2,
+  "3c"  = (oosy_3 - clean_pred(maf_lasso3c$pred))^2,
+  "6c"  = (oosy_6 - clean_pred(maf_lasso6c$pred))^2,
   "12c" = (oosy_12 - clean_pred(maf_lasso12c$pred))^2
 )
 
@@ -243,7 +359,7 @@ loss_lasso_marx <- list(
   "12c" = (oosy_12 - clean_pred(marx_lasso12c$pred))^2
 )
 
-# RF Benchmark
+# RF
 loss_rf_bench <- list(
   "1c"  = (oosy_1 - clean_pred(rf12c$pred))^2,
   "3c"  = (oosy_3 - clean_pred(rf32c$pred))^2,
@@ -262,135 +378,250 @@ loss_rf_maf <- list(
 # RF MARX
 loss_rf_marx <- list(
   "1c"  = (oosy_1 - clean_pred(marx_rf1$pred))^2,
-  "3c"  = (oosy_3 - clean_pred((marx_rf3$pred)))^2,
+  "3c"  = (oosy_3 - clean_pred(marx_rf3$pred))^2,
   "6c"  = (oosy_6 - clean_pred(marx_rf6$pred))^2,
   "12c" = (oosy_12 - clean_pred(marx_rf12$pred))^2
 )
 
 # Hybrid
-#loss_hybrid <- list(
-#  "1c"  = (oosy_1 - hybrid1c$pred)^2,
-#  "3c"  = (oosy_3 - hybrid3c$pred)^2,
-#  "6c"  = (oosy_6 - hybrid6c$pred)^2,
-#  "12c" = (oosy_12 - hybrid12c$pred)^2
-#)
+loss_hybrid_bench <- list(
+  "1c"  = (oosy_1 - clean_pred(hybrid_bench_1c$pred))^2,
+  "3c"  = (oosy_3 - clean_pred(hybrid_bench_3c$pred))^2,
+  "6c"  = (oosy_6 - clean_pred(hybrid_bench_6c$pred))^2,
+  "12c" = (oosy_12 - clean_pred(hybrid_bench_12c$pred))^2
+)
 
+# Hybrid MAF
+loss_hybrid_maf <- list(
+  "1c"  = (oosy_1 - clean_pred(hybrid_maf_1c$pred))^2,
+  "3c"  = (oosy_3 - clean_pred(hybrid_maf_3c$pred))^2,
+  "6c"  = (oosy_6 - clean_pred(hybrid_maf_6c$pred))^2,
+  "12c" = (oosy_12 - clean_pred(hybrid_maf_12c$pred))^2
+)
 
-# STEP 2: Run DM tests for all models vs AR
+# Hybrid MARX
+loss_hybrid_marx <- list(
+  "1c"  = (oosy_1 - clean_pred(hybrid_marx_1c$pred))^2,
+  "3c"  = (oosy_3 - clean_pred(hybrid_marx_3c$pred))^2,
+  "6c"  = (oosy_6 - clean_pred(hybrid_marx_6c$pred))^2,
+  "12c" = (oosy_12 - clean_pred(hybrid_marx_12c$pred))^2
+)
+
+# STEP 2A: Run DM tests for all models vs AR
 # Run tests
-cat("\n--- ADL Models ---\n")
-dm_adl_bench <- run_dm_test_vs_ar("ADL Benchmark", loss_ar, loss_adl_bench)
-dm_adl_maf   <- run_dm_test_vs_ar("ADL MAF", loss_ar, loss_adl_maf)
-dm_adl_marx  <- run_dm_test_vs_ar("ADL MARX", loss_ar, loss_adl_marx)
+cat("\n--- ADL (no PCA) ---\n")
+dm_adl_bench_vs_ar <- run_dm_test_vs_ar("ADL", loss_ar, loss_adl_bench)
+
+cat("\n--- ADL PCA Models ---\n")
+dm_adl_benchpca_vs_ar <- run_dm_test_vs_ar("ADL PCA", loss_ar, loss_adl_benchpca)
+dm_adl_mafpca_vs_ar   <- run_dm_test_vs_ar("ADL MAF PCA", loss_ar, loss_adl_mafpca)
+dm_adl_marxpca_vs_ar  <- run_dm_test_vs_ar("ADL MARX PCA", loss_ar, loss_adl_marxpca)
 
 cat("\n--- LASSO Models ---\n")
-dm_lasso_bench <- run_dm_test_vs_ar("LASSO Benchmark", loss_ar, loss_lasso_bench)
-dm_lasso_maf   <- run_dm_test_vs_ar("LASSO MAF", loss_ar, loss_lasso_maf)
-dm_lasso_marx  <- run_dm_test_vs_ar("LASSO MARX", loss_ar, loss_lasso_marx)
+dm_lasso_bench_vs_ar <- run_dm_test_vs_ar("LASSO", loss_ar, loss_lasso_bench)
+dm_lasso_maf_vs_ar   <- run_dm_test_vs_ar("LASSO MAF", loss_ar, loss_lasso_maf)
+dm_lasso_marx_vs_ar  <- run_dm_test_vs_ar("LASSO MARX", loss_ar, loss_lasso_marx)
 
 cat("\n--- RF Models ---\n")
-dm_rf_bench <- run_dm_test_vs_ar("RF Benchmark", loss_ar, loss_rf_bench)
-dm_rf_maf   <- run_dm_test_vs_ar("RF MAF", loss_ar, loss_rf_maf)
-dm_rf_marx  <- run_dm_test_vs_ar("RF MARX", loss_ar, loss_rf_marx)
+dm_rf_bench_vs_ar <- run_dm_test_vs_ar("RF", loss_ar, loss_rf_bench)
+dm_rf_maf_vs_ar   <- run_dm_test_vs_ar("RF MAF", loss_ar, loss_rf_maf)
+dm_rf_marx_vs_ar  <- run_dm_test_vs_ar("RF MARX", loss_ar, loss_rf_marx)
 
 cat("\n--- Hybrid Models ---\n")
-dm_hybrid_bench <- run_dm_test_vs_ar("Hybrid Benchmark", loss_ar, loss_hybrid_bench)
-dm_hybrid_maf   <- run_dm_test_vs_ar("Hybrid MAF", loss_ar, loss_hybrid_maf)
-dm_hybrid_marx  <- run_dm_test_vs_ar("Hybrid MARX", loss_ar, loss_hybrid_marx)
+dm_hybrid_bench_vs_ar <- run_dm_test_vs_ar("Hybrid", loss_ar, loss_hybrid_bench)
+dm_hybrid_maf_vs_ar   <- run_dm_test_vs_ar("Hybrid MAF", loss_ar, loss_hybrid_maf)
+dm_hybrid_marx_vs_ar  <- run_dm_test_vs_ar("Hybrid MARX", loss_ar, loss_hybrid_marx)
+
+# STEP 2B: Run DM tests for all models vs ADL without PCA
+cat("\n--- AR Model ---\n")
+dm_ar_vs_adl <- run_dm_test_vs_adl("AR", loss_adl_bench, loss_ar)
+
+cat("\n--- ADL PCA Models ---\n")
+dm_adl_benchpca_vs_adl <- run_dm_test_vs_adl("ADL PCA", loss_adl_bench, loss_adl_benchpca)
+dm_adl_mafpca_vs_adl   <- run_dm_test_vs_adl("ADL MAF PCA", loss_adl_bench, loss_adl_mafpca)
+dm_adl_marxpca_vs_adl  <- run_dm_test_vs_adl("ADL MARX PCA", loss_adl_bench, loss_adl_marxpca)
+
+cat("\n--- LASSO Models ---\n")
+dm_lasso_bench_vs_adl <- run_dm_test_vs_adl("LASSO", loss_adl_bench, loss_lasso_bench)
+dm_lasso_maf_vs_adl   <- run_dm_test_vs_adl("LASSO MAF", loss_adl_bench, loss_lasso_maf)
+dm_lasso_marx_vs_adl  <- run_dm_test_vs_adl("LASSO MARX", loss_adl_bench, loss_lasso_marx)
+
+cat("\n--- RF Models ---\n")
+dm_rf_bench_vs_adl <- run_dm_test_vs_adl("RF", loss_adl_bench, loss_rf_bench)
+dm_rf_maf_vs_adl   <- run_dm_test_vs_adl("RF MAF", loss_adl_bench, loss_rf_maf)
+dm_rf_marx_vs_adl  <- run_dm_test_vs_adl("RF MARX", loss_adl_bench, loss_rf_marx)
+
+cat("\n--- Hybrid Models ---\n")
+dm_hybrid_bench_vs_adl <- run_dm_test_vs_adl("Hybrid", loss_adl_bench, loss_hybrid_bench)
+dm_hybrid_maf_vs_adl   <- run_dm_test_vs_adl("Hybrid MAF", loss_adl_bench, loss_hybrid_maf)
+dm_hybrid_marx_vs_adl  <- run_dm_test_vs_adl("Hybrid MARX", loss_adl_bench, loss_hybrid_marx)
 
 
-# STEP 3: Collect results into 4×12 matrix
+# STEP 3A: Collect results into 4×13 matrix for AR benchmark
+dm_results_vs_ar <- matrix(NA, nrow = 4, ncol = 13)
+colnames(dm_results_vs_ar) <- c("ADL", "ADL_PCA", "ADL_MAF_PCA", "ADL_MARX_PCA",
+                                "LASSO", "LASSO_MAF", "LASSO_MARX",
+                                "RF", "RF_MAF", "RF_MARX", 
+                                "Hybrid", "Hybrid_MAF", "Hybrid_MARX")
+rownames(dm_results_vs_ar) <- c("1-step", "3-step", "6-step", "12-step")
 
-dm_results <- matrix(NA, nrow = 4, ncol = 12)
-colnames(dm_results) <- c("ADL_Bench", "ADL_MAF", "ADL_MARX", 
-                          "LASSO_Bench", "LASSO_MAF", "LASSO_MARX",
-                          "RF_Bench", "RF_MAF", "RF_MARX", 
-                          "Hybrid_Bench", "Hybrid_MAF", "Hybrid_MARX")
-rownames(dm_results) <- c("1-step", "3-step", "6-step", "12-step")
+dm_results_vs_ar[, 1]  <- dm_adl_bench_vs_ar$dm_stats
+dm_results_vs_ar[, 2]  <- dm_adl_benchpca_vs_ar$dm_stats
+dm_results_vs_ar[, 3]  <- dm_adl_mafpca_vs_ar$dm_stats
+dm_results_vs_ar[, 4]  <- dm_adl_marxpca_vs_ar$dm_stats
+dm_results_vs_ar[, 5]  <- dm_lasso_bench_vs_ar$dm_stats
+dm_results_vs_ar[, 6]  <- dm_lasso_maf_vs_ar$dm_stats
+dm_results_vs_ar[, 7]  <- dm_lasso_marx_vs_ar$dm_stats
+dm_results_vs_ar[, 8]  <- dm_rf_bench_vs_ar$dm_stats
+dm_results_vs_ar[, 9]  <- dm_rf_maf_vs_ar$dm_stats
+dm_results_vs_ar[, 10] <- dm_rf_marx_vs_ar$dm_stats
+dm_results_vs_ar[, 11] <- dm_hybrid_bench_vs_ar$dm_stats
+dm_results_vs_ar[, 12] <- dm_hybrid_maf_vs_ar$dm_stats
+dm_results_vs_ar[, 13] <- dm_hybrid_marx_vs_ar$dm_stats
 
-# Fill in results
-dm_results[, 1]  <- dm_adl_bench$dm_stats
-dm_results[, 2]  <- dm_adl_maf$dm_stats
-dm_results[, 3]  <- dm_adl_marx$dm_stats
-dm_results[, 4]  <- dm_lasso_bench$dm_stats
-dm_results[, 5]  <- dm_lasso_maf$dm_stats
-dm_results[, 6]  <- dm_lasso_marx$dm_stats
-dm_results[, 7]  <- dm_rf_bench$dm_stats
-dm_results[, 8]  <- dm_rf_maf$dm_stats
-dm_results[, 9]  <- dm_rf_marx$dm_stats
-dm_results[, 10] <- dm_hybrid_bench$dm_stats
-dm_results[, 11] <- dm_hybrid_maf$dm_stats
-dm_results[, 12] <- dm_hybrid_marx$dm_stats
+# STEP 3B: Collect results into 4×13 matrix for ADL benchmark
+dm_results_vs_adl <- matrix(NA, nrow = 4, ncol = 13)
+colnames(dm_results_vs_adl) <- c("AR", "ADL_PCA", "ADL_MAF_PCA", "ADL_MARX_PCA",
+                                 "LASSO", "LASSO_MAF", "LASSO_MARX",
+                                 "RF", "RF_MAF", "RF_MARX", 
+                                 "Hybrid", "Hybrid_MAF", "Hybrid_MARX")
+rownames(dm_results_vs_adl) <- c("1-step", "3-step", "6-step", "12-step")
+
+dm_results_vs_adl[, 1]  <- dm_ar_vs_adl$dm_stats
+dm_results_vs_adl[, 2]  <- dm_adl_benchpca_vs_adl$dm_stats
+dm_results_vs_adl[, 3]  <- dm_adl_mafpca_vs_adl$dm_stats
+dm_results_vs_adl[, 4]  <- dm_adl_marxpca_vs_adl$dm_stats
+dm_results_vs_adl[, 5]  <- dm_lasso_bench_vs_adl$dm_stats
+dm_results_vs_adl[, 6]  <- dm_lasso_maf_vs_adl$dm_stats
+dm_results_vs_adl[, 7]  <- dm_lasso_marx_vs_adl$dm_stats
+dm_results_vs_adl[, 8]  <- dm_rf_bench_vs_adl$dm_stats
+dm_results_vs_adl[, 9]  <- dm_rf_maf_vs_adl$dm_stats
+dm_results_vs_adl[, 10] <- dm_rf_marx_vs_adl$dm_stats
+dm_results_vs_adl[, 11] <- dm_hybrid_bench_vs_adl$dm_stats
+dm_results_vs_adl[, 12] <- dm_hybrid_maf_vs_adl$dm_stats
+dm_results_vs_adl[, 13] <- dm_hybrid_marx_vs_adl$dm_stats
+
+# STEP 4A: Compute p-values for AR 
+
+p_results_vs_ar <- 2 * (1 - pnorm(abs(dm_results_vs_ar)))
+colnames(p_results_vs_ar) <- colnames(dm_results_vs_ar)
+rownames(p_results_vs_ar) <- rownames(dm_results_vs_ar)
+
+# Step 4B: Compute p-values for ADL
+p_results_vs_adl <- 2 * (1 - pnorm(abs(dm_results_vs_adl)))
+colnames(p_results_vs_adl) <- colnames(dm_results_vs_adl)
+rownames(p_results_vs_adl) <- rownames(dm_results_vs_adl)
 
 
-# STEP 4: Compute p-values
-
-p_results <- 2 * (1 - pnorm(abs(dm_results)))
-colnames(p_results) <- colnames(dm_results)
-rownames(p_results) <- rownames(dm_results)
-
-
-# STEP 5: Create formatted table with significance stars
-
+# STEP 5A: Format results - vs AR
 format_dm <- function(dm_stat, p_val) {
   if (is.na(dm_stat)) return("—")
   
   sig <- ""
-  if (p_val < 0.01) sig <- "***"
-  else if (p_val < 0.05) sig <- "**"
-  else if (p_val < 0.10) sig <- "*"
+  if (p_val < 0.01) sig <- " [p<0.01]"
+  else if (p_val < 0.05) sig <- " [p<0.05]"
+  else if (p_val < 0.10) sig <- " [p<0.10]"
   
   return(paste0(sprintf("%.2f", dm_stat), sig))
 }
 
-dm_formatted <- matrix(NA, nrow = 4, ncol = 12)
+dm_formatted_vs_ar <- matrix(NA, nrow = 4, ncol = 13)
 for (i in 1:4) {
-  for (j in 1:12) {
-    dm_formatted[i, j] <- format_dm(dm_results[i, j], p_results[i, j])
+  for (j in 1:13) {
+    dm_formatted_vs_ar[i, j] <- format_dm(dm_results_vs_ar[i, j], p_results_vs_ar[i, j])
   }
 }
-colnames(dm_formatted) <- colnames(dm_results)
-rownames(dm_formatted) <- rownames(dm_results)
+colnames(dm_formatted_vs_ar) <- colnames(dm_results_vs_ar)
+rownames(dm_formatted_vs_ar) <- rownames(dm_results_vs_ar)
+
+# STEP 5B: Format results - vs ADL
+
+dm_formatted_vs_adl <- matrix(NA, nrow = 4, ncol = 13)
+for (i in 1:4) {
+  for (j in 1:13) {
+    dm_formatted_vs_adl[i, j] <- format_dm(dm_results_vs_adl[i, j], p_results_vs_adl[i, j])
+  }
+}
+colnames(dm_formatted_vs_adl) <- colnames(dm_results_vs_adl)
+rownames(dm_formatted_vs_adl) <- rownames(dm_results_vs_adl)
 
 
 # STEP 6: Display results
 
 cat("DM T-STATISTICS:\n")
-print(round(dm_results, 3))
+cat("(Positive = Model beats AR | Negative = AR beats Model)\n\n")
+print(round(dm_results_vs_ar, 3))
 
 cat("\n\nP-VALUES:\n\n")
-print(round(p_results, 4))
+print(round(p_results_vs_ar, 4))
 
-cat("Note: *** p<0.01, ** p<0.05, * p<0.10\n\n")
-print(dm_formatted, quote = FALSE)
+cat("\n\nFORMATTED TABLE:\n")
+cat("Note: [p<0.01] = highly significant, [p<0.05] = significant, [p<0.10] = marginally significant\n\n")
+print(dm_formatted_vs_ar, quote = FALSE)
 
+cat("DM T-STATISTICS:\n")
+cat("(Positive = Model beats ADL | Negative = ADL beats Model)\n\n")
+print(round(dm_results_vs_adl, 3))
+
+cat("\n\nP-VALUES:\n\n")
+print(round(p_results_vs_adl, 4))
+
+cat("\n\nFORMATTED TABLE:\n")
+cat("Note: [p<0.01] = highly significant, [p<0.05] = significant, [p<0.10] = marginally significant\n\n")
+print(dm_formatted_vs_adl, quote = FALSE)
 
 # STEP 7: Summary Statistics
+sig_01_ar <- sum(p_results_vs_ar < 0.01, na.rm = TRUE)
+sig_05_ar <- sum(p_results_vs_ar < 0.05, na.rm = TRUE)
+sig_10_ar <- sum(p_results_vs_ar < 0.10, na.rm = TRUE)
 
-# Count significant wins at each level
-sig_01 <- sum(p_results < 0.01, na.rm = TRUE)
-sig_05 <- sum(p_results < 0.05, na.rm = TRUE)
-sig_10 <- sum(p_results < 0.10, na.rm = TRUE)
-
-cat("Significant improvements over AR(P):\n")
-cat("  At 1% level (***): ", sig_01, " out of 48 tests\n")
-cat("  At 5% level (**):  ", sig_05, " out of 48 tests\n")
-cat("  At 10% level (*):  ", sig_10, " out of 48 tests\n\n")
+cat("Significant improvements over AR:\n")
+cat("  At 1 percent level:  ", sig_01_ar, " out of 52 tests\n")
+cat("  At 5 percent level:  ", sig_05_ar, " out of 52 tests\n")
+cat("  At 10 percent level: ", sig_10_ar, " out of 52 tests\n\n")
 
 # Best model by horizon
 cat("Best performing model by horizon:\n")
 for (i in 1:4) {
-  best_idx <- which.max(dm_results[i, ])
-  best_model <- colnames(dm_results)[best_idx]
-  best_stat <- dm_results[i, best_idx]
-  best_pval <- p_results[i, best_idx]
+  best_idx <- which.max(dm_results_vs_ar[i, ])
+  best_model <- colnames(dm_results_vs_ar)[best_idx]
+  best_stat <- dm_results_vs_ar[i, best_idx]
+  best_pval <- p_results_vs_ar[i, best_idx]
   
-  cat("  ", rownames(dm_results)[i], ": ", best_model, 
+  cat("  ", rownames(dm_results_vs_ar)[i], ": ", best_model, 
       " (DM=", round(best_stat, 2), ", p=", round(best_pval, 4), ")\n", sep="")
 }
 
 # Overall best model (across all horizons)
 cat("\nOverall best model (highest average DM statistic):\n")
-avg_dm <- colMeans(dm_results)
-best_overall <- which.max(avg_dm)
-cat("  ", names(avg_dm)[best_overall], " (Avg DM=", round(avg_dm[best_overall], 2), ")\n", sep="")
+avg_dm_ar <- colMeans(dm_results_vs_ar)
+best_overall_ar <- which.max(avg_dm_ar)
+cat("  ", names(avg_dm_ar)[best_overall_ar], " (Avg DM=", round(avg_dm_ar[best_overall_ar], 2), ")\n", sep="")
+
+
+sig_01_adl <- sum(p_results_vs_adl < 0.01, na.rm = TRUE)
+sig_05_adl <- sum(p_results_vs_adl < 0.05, na.rm = TRUE)
+sig_10_adl <- sum(p_results_vs_adl < 0.10, na.rm = TRUE)
+
+cat("Significant improvements over ADL:\n")
+cat("  At 1 percent level:  ", sig_01_adl, " out of 52 tests\n")
+cat("  At 5 percent level:  ", sig_05_adl, " out of 52 tests\n")
+cat("  At 10 percent level: ", sig_10_adl, " out of 52 tests\n\n")
+
+# Best model by horizon
+cat("Best performing model by horizon:\n")
+for (i in 1:4) {
+  best_idx <- which.max(dm_results_vs_adl[i, ])
+  best_model <- colnames(dm_results_vs_adl)[best_idx]
+  best_stat <- dm_results_vs_adl[i, best_idx]
+  best_pval <- p_results_vs_adl[i, best_idx]
+  
+  cat("  ", rownames(dm_results_vs_adl)[i], ": ", best_model, 
+      " (DM=", round(best_stat, 2), ", p=", round(best_pval, 4), ")\n", sep="")
+}
+
+# Overall best model (across all horizons)
+cat("\nOverall best model (highest average DM statistic):\n")
+avg_dm_adl <- colMeans(dm_results_vs_adl)
+best_overall_adl <- which.max(avg_dm_adl)
+cat("  ", names(avg_dm_adl)[best_overall_adl], " (Avg DM=", round(avg_dm_adl[best_overall_adl], 2), ")\n", sep="")
