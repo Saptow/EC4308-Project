@@ -501,127 +501,138 @@ dm_results_vs_adl[, 11] <- dm_hybrid_bench_vs_adl$dm_stats
 dm_results_vs_adl[, 12] <- dm_hybrid_maf_vs_adl$dm_stats
 dm_results_vs_adl[, 13] <- dm_hybrid_marx_vs_adl$dm_stats
 
-# STEP 4A: Compute p-values for AR 
+# STEP 4: Create RMSE table
+# Initialize RMSE table with AR and all 13 comparison models
+rmse_table <- matrix(NA, nrow = 4, ncol = 14)
+colnames(rmse_table) <- c("AR", "ADL", "ADL_PCA", "ADL_MAF_PCA", "ADL_MARX_PCA",
+                          "LASSO", "LASSO_MAF", "LASSO_MARX",
+                          "RF", "RF_MAF", "RF_MARX", 
+                          "Hybrid", "Hybrid_MAF", "Hybrid_MARX")
+rownames(rmse_table) <- c("1-step", "3-step", "6-step", "12-step")
 
-p_results_vs_ar <- 2 * (1 - pnorm(abs(dm_results_vs_ar)))
-colnames(p_results_vs_ar) <- colnames(dm_results_vs_ar)
-rownames(p_results_vs_ar) <- rownames(dm_results_vs_ar)
+# Fill in RMSE values using correct syntax [["errors"]][["rmse"]]
+rmse_table[1, "AR"]           <- bar1c[["errors"]][["rmse"]]
+rmse_table[2, "AR"]           <- bar3c[["errors"]][["rmse"]]
+rmse_table[3, "AR"]           <- bar6c[["errors"]][["rmse"]]
+rmse_table[4, "AR"]           <- bar12c[["errors"]][["rmse"]]
 
-# Step 4B: Compute p-values for ADL
-p_results_vs_adl <- 2 * (1 - pnorm(abs(dm_results_vs_adl)))
-colnames(p_results_vs_adl) <- colnames(dm_results_vs_adl)
-rownames(p_results_vs_adl) <- rownames(dm_results_vs_adl)
+rmse_table[1, "ADL"]          <- adl_bench_1c[["errors"]][["rmse"]]
+rmse_table[2, "ADL"]          <- adl_bench_3c[["errors"]][["rmse"]]
+rmse_table[3, "ADL"]          <- adl_bench_6c[["errors"]][["rmse"]]
+rmse_table[4, "ADL"]          <- adl_bench_12c[["errors"]][["rmse"]]
 
+rmse_table[1, "ADL_PCA"]      <- adl_benchpca_1c[["errors"]][["rmse"]]
+rmse_table[2, "ADL_PCA"]      <- adl_benchpca_3c[["errors"]][["rmse"]]
+rmse_table[3, "ADL_PCA"]      <- adl_benchpca_6c[["errors"]][["rmse"]]
+rmse_table[4, "ADL_PCA"]      <- adl_benchpca_12c[["errors"]][["rmse"]]
 
-# STEP 5A: Format results - vs AR
-format_dm <- function(dm_stat, p_val) {
-  if (is.na(dm_stat)) return("—")
-  
-  sig <- ""
-  if (p_val < 0.01) sig <- " [p<0.01]"
-  else if (p_val < 0.05) sig <- " [p<0.05]"
-  else if (p_val < 0.10) sig <- " [p<0.10]"
-  
-  return(paste0(sprintf("%.2f", dm_stat), sig))
-}
+rmse_table[1, "ADL_MAF_PCA"]  <- adl_mafpca_1c[["errors"]][["rmse"]]
+rmse_table[2, "ADL_MAF_PCA"]  <- adl_mafpca_3c[["errors"]][["rmse"]]
+rmse_table[3, "ADL_MAF_PCA"]  <- adl_mafpca_6c[["errors"]][["rmse"]]
+rmse_table[4, "ADL_MAF_PCA"]  <- adl_mafpca_12c[["errors"]][["rmse"]]
 
-dm_formatted_vs_ar <- matrix(NA, nrow = 4, ncol = 13)
-for (i in 1:4) {
-  for (j in 1:13) {
-    dm_formatted_vs_ar[i, j] <- format_dm(dm_results_vs_ar[i, j], p_results_vs_ar[i, j])
-  }
-}
-colnames(dm_formatted_vs_ar) <- colnames(dm_results_vs_ar)
-rownames(dm_formatted_vs_ar) <- rownames(dm_results_vs_ar)
+rmse_table[1, "ADL_MARX_PCA"] <- adl_marxpca_1c[["errors"]][["rmse"]]
+rmse_table[2, "ADL_MARX_PCA"] <- adl_marxpca_3c[["errors"]][["rmse"]]
+rmse_table[3, "ADL_MARX_PCA"] <- adl_marxpca_6c[["errors"]][["rmse"]]
+rmse_table[4, "ADL_MARX_PCA"] <- adl_marxpca_12c[["errors"]][["rmse"]]
 
-# STEP 5B: Format results - vs ADL
+rmse_table[1, "LASSO"]        <- lasso1c[["errors"]][["rmse"]]
+rmse_table[2, "LASSO"]        <- lasso3c[["errors"]][["rmse"]]
+rmse_table[3, "LASSO"]        <- lasso6c[["errors"]][["rmse"]]
+rmse_table[4, "LASSO"]        <- lasso12c[["errors"]][["rmse"]]
 
-dm_formatted_vs_adl <- matrix(NA, nrow = 4, ncol = 13)
-for (i in 1:4) {
-  for (j in 1:13) {
-    dm_formatted_vs_adl[i, j] <- format_dm(dm_results_vs_adl[i, j], p_results_vs_adl[i, j])
-  }
-}
-colnames(dm_formatted_vs_adl) <- colnames(dm_results_vs_adl)
-rownames(dm_formatted_vs_adl) <- rownames(dm_results_vs_adl)
+rmse_table[1, "LASSO_MAF"]    <- maf_lasso1c[["errors"]][["rmse"]]
+rmse_table[2, "LASSO_MAF"]    <- maf_lasso3c[["errors"]][["rmse"]]
+rmse_table[3, "LASSO_MAF"]    <- maf_lasso6c[["errors"]][["rmse"]]
+rmse_table[4, "LASSO_MAF"]    <- maf_lasso12c[["errors"]][["rmse"]]
 
+rmse_table[1, "LASSO_MARX"]   <- marx_lasso1c[["errors"]][["rmse"]]
+rmse_table[2, "LASSO_MARX"]   <- marx_lasso3c[["errors"]][["rmse"]]
+rmse_table[3, "LASSO_MARX"]   <- marx_lasso6c[["errors"]][["rmse"]]
+rmse_table[4, "LASSO_MARX"]   <- marx_lasso12c[["errors"]][["rmse"]]
 
-# STEP 6: Display results
+rmse_table[1, "RF"]           <- rf12c[["errors"]][["rmse"]]
+rmse_table[2, "RF"]           <- rf32c[["errors"]][["rmse"]]
+rmse_table[3, "RF"]           <- rf62c[["errors"]][["rmse"]]
+rmse_table[4, "RF"]           <- rf122c[["errors"]][["rmse"]]
 
-cat("DM T-STATISTICS:\n")
-cat("(Positive = Model beats AR | Negative = AR beats Model)\n\n")
+rmse_table[1, "RF_MAF"]       <- maf_rf1[["errors"]][["rmse"]]
+rmse_table[2, "RF_MAF"]       <- maf_rf3[["errors"]][["rmse"]]
+rmse_table[3, "RF_MAF"]       <- maf_rf6[["errors"]][["rmse"]]
+rmse_table[4, "RF_MAF"]       <- maf_rf12[["errors"]][["rmse"]]
+
+rmse_table[1, "RF_MARX"]      <- marx_rf1[["errors"]][["rmse"]]
+rmse_table[2, "RF_MARX"]      <- marx_rf3[["errors"]][["rmse"]]
+rmse_table[3, "RF_MARX"]      <- marx_rf6[["errors"]][["rmse"]]
+rmse_table[4, "RF_MARX"]      <- marx_rf12[["errors"]][["rmse"]]
+
+rmse_table[1, "Hybrid"]       <- hybrid_bench_1c[["errors"]][["rmse"]]
+rmse_table[2, "Hybrid"]       <- hybrid_bench_3c[["errors"]][["rmse"]]
+rmse_table[3, "Hybrid"]       <- hybrid_bench_6c[["errors"]][["rmse"]]
+rmse_table[4, "Hybrid"]       <- hybrid_bench_12c[["errors"]][["rmse"]]
+
+rmse_table[1, "Hybrid_MAF"]   <- hybrid_maf_1c[["errors"]][["rmse"]]
+rmse_table[2, "Hybrid_MAF"]   <- hybrid_maf_3c[["errors"]][["rmse"]]
+rmse_table[3, "Hybrid_MAF"]   <- hybrid_maf_6c[["errors"]][["rmse"]]
+rmse_table[4, "Hybrid_MAF"]   <- hybrid_maf_12c[["errors"]][["rmse"]]
+
+rmse_table[1, "Hybrid_MARX"]  <- hybrid_marx_1c[["errors"]][["rmse"]]
+rmse_table[2, "Hybrid_MARX"]  <- hybrid_marx_3c[["errors"]][["rmse"]]
+rmse_table[3, "Hybrid_MARX"]  <- hybrid_marx_6c[["errors"]][["rmse"]]
+rmse_table[4, "Hybrid_MARX"]  <- hybrid_marx_12c[["errors"]][["rmse"]]
+
+# STEP 5: Display Results
+cat("   RMSE TABLE (All Models)\n")
+print(round(rmse_table, 3))
+
+cat("   DM TEST RESULTS vs AR BENCHMARK\n")
 print(round(dm_results_vs_ar, 3))
 
-cat("\n\nP-VALUES:\n\n")
-print(round(p_results_vs_ar, 4))
-
-cat("\n\nFORMATTED TABLE:\n")
-cat("Note: [p<0.01] = highly significant, [p<0.05] = significant, [p<0.10] = marginally significant\n\n")
-print(dm_formatted_vs_ar, quote = FALSE)
-
-cat("DM T-STATISTICS:\n")
-cat("(Positive = Model beats ADL | Negative = ADL beats Model)\n\n")
+cat("   DM TEST RESULTS vs ADL BENCHMARK\n")
 print(round(dm_results_vs_adl, 3))
 
-cat("\n\nP-VALUES:\n\n")
-print(round(p_results_vs_adl, 4))
+# STEP 6: Identify best models by horizon and compute averages
 
-cat("\n\nFORMATTED TABLE:\n")
-cat("Note: [p<0.01] = highly significant, [p<0.05] = significant, [p<0.10] = marginally significant\n\n")
-print(dm_formatted_vs_adl, quote = FALSE)
-
-# STEP 7: Summary Statistics
-sig_01_ar <- sum(p_results_vs_ar < 0.01, na.rm = TRUE)
-sig_05_ar <- sum(p_results_vs_ar < 0.05, na.rm = TRUE)
-sig_10_ar <- sum(p_results_vs_ar < 0.10, na.rm = TRUE)
-
-cat("Significant improvements over AR:\n")
-cat("  At 1 percent level:  ", sig_01_ar, " out of 52 tests\n")
-cat("  At 5 percent level:  ", sig_05_ar, " out of 52 tests\n")
-cat("  At 10 percent level: ", sig_10_ar, " out of 52 tests\n\n")
-
-# Best model by horizon
-cat("Best performing model by horizon:\n")
+# Best model by horizon (vs AR) - highest DM statistic
+cat("   BEST MODEL BY HORIZON (vs AR Benchmark)\n")
 for (i in 1:4) {
   best_idx <- which.max(dm_results_vs_ar[i, ])
   best_model <- colnames(dm_results_vs_ar)[best_idx]
-  best_stat <- dm_results_vs_ar[i, best_idx]
-  best_pval <- p_results_vs_ar[i, best_idx]
-  
-  cat("  ", rownames(dm_results_vs_ar)[i], ": ", best_model, 
-      " (DM=", round(best_stat, 2), ", p=", round(best_pval, 4), ")\n", sep="")
+  best_dm <- dm_results_vs_ar[i, best_idx]
+  cat(sprintf("%s: %s (DM = %.3f)\n", 
+              rownames(dm_results_vs_ar)[i], best_model, best_dm))
 }
 
-# Overall best model (across all horizons)
-cat("\nOverall best model (highest average DM statistic):\n")
-avg_dm_ar <- colMeans(dm_results_vs_ar)
-best_overall_ar <- which.max(avg_dm_ar)
-cat("  ", names(avg_dm_ar)[best_overall_ar], " (Avg DM=", round(avg_dm_ar[best_overall_ar], 2), ")\n", sep="")
-
-
-sig_01_adl <- sum(p_results_vs_adl < 0.01, na.rm = TRUE)
-sig_05_adl <- sum(p_results_vs_adl < 0.05, na.rm = TRUE)
-sig_10_adl <- sum(p_results_vs_adl < 0.10, na.rm = TRUE)
-
-cat("Significant improvements over ADL:\n")
-cat("  At 1 percent level:  ", sig_01_adl, " out of 52 tests\n")
-cat("  At 5 percent level:  ", sig_05_adl, " out of 52 tests\n")
-cat("  At 10 percent level: ", sig_10_adl, " out of 52 tests\n\n")
-
-# Best model by horizon
-cat("Best performing model by horizon:\n")
+# Best model by horizon (vs ADL) - highest DM statistic
+cat("   BEST MODEL BY HORIZON (vs ADL Benchmark)\n")
 for (i in 1:4) {
   best_idx <- which.max(dm_results_vs_adl[i, ])
   best_model <- colnames(dm_results_vs_adl)[best_idx]
-  best_stat <- dm_results_vs_adl[i, best_idx]
-  best_pval <- p_results_vs_adl[i, best_idx]
-  
-  cat("  ", rownames(dm_results_vs_adl)[i], ": ", best_model, 
-      " (DM=", round(best_stat, 2), ", p=", round(best_pval, 4), ")\n", sep="")
+  best_dm <- dm_results_vs_adl[i, best_idx]
+  cat(sprintf("%s: %s (DM = %.3f)\n", 
+              rownames(dm_results_vs_adl)[i], best_model, best_dm))
 }
+# Add average DM statistic row for vs AR
+dm_avg_vs_ar <- colMeans(dm_results_vs_ar)
+dm_with_avg_vs_ar <- rbind(dm_results_vs_ar, Average = dm_avg_vs_ar)
 
-# Overall best model (across all horizons)
-cat("\nOverall best model (highest average DM statistic):\n")
-avg_dm_adl <- colMeans(dm_results_vs_adl)
-best_overall_adl <- which.max(avg_dm_adl)
-cat("  ", names(avg_dm_adl)[best_overall_adl], " (Avg DM=", round(avg_dm_adl[best_overall_adl], 2), ")\n", sep="")
+# Add average DM statistic row for vs ADL
+dm_avg_vs_adl <- colMeans(dm_results_vs_adl)
+dm_with_avg_vs_adl <- rbind(dm_results_vs_adl, Average = dm_avg_vs_adl)
+
+# Best model overall by average DM (vs AR)
+cat("   BEST MODEL BY AVERAGE DM STATISTIC (vs AR)\n")
+best_overall_idx_ar <- which.max(dm_avg_vs_ar)
+best_overall_model_ar <- names(dm_avg_vs_ar)[best_overall_idx_ar]
+best_overall_dm_ar <- dm_avg_vs_ar[best_overall_idx_ar]
+cat(sprintf("Best Model: %s (Average DM = %.3f)\n", 
+            best_overall_model_ar, best_overall_dm_ar))
+
+
+# Best model overall by average DM (vs ADL)
+cat("   BEST MODEL BY AVERAGE DM STATISTIC (vs ADL)\n")
+best_overall_idx_adl <- which.max(dm_avg_vs_adl)
+best_overall_model_adl <- names(dm_avg_vs_adl)[best_overall_idx_adl]
+best_overall_dm_adl <- dm_avg_vs_adl[best_overall_idx_adl]
+cat(sprintf("Best Model: %s (Average DM = %.3f)\n", 
+            best_overall_model_adl, best_overall_dm_adl))
