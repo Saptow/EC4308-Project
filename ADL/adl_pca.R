@@ -45,7 +45,8 @@ for (h in horizon_windows){
     p_fixed = 4,
     q_fixed = 4,
     use_x0 = TRUE,
-    x_dimred = "pca"
+    x_dimred = "pca",
+    pca_var = 0.90
   )
   save(res_fixed, file = paste0("./ADL/pca_adl_rolling_fixed_h", h, ".RData"))
 }
@@ -133,11 +134,11 @@ plot_ardl_bench <- function( res_fixed, res_maf, res_marx, real,
   lines(obj[, "ARDL-Fixed"], col = "red",    lwd = 1.5, lty = 2)
   lines(obj[, "ARDL-MAF"],   col = "green",  lwd = 1.5)
   lines(obj[, "ARDL-MARX"],  col = "purple", lwd = 1.5)
-  legend("topright",
-         legend = c("ARDL-Fixed", "ARDL-MAF", "ARDL-MARX", "Actual"),
-         col = c("red", "green", "purple", "black"),
-         lty = c(1, 2, 1, 1, 1), lwd = c(1.5, 1.5, 1.5, 1.5, 2),
-         bty = "n", cex = 0.8)
+  # legend("topright",
+  #        legend = c("ARDL-Fixed", "ARDL-MAF", "ARDL-MARX", "Actual"),
+  #        col = c("red", "green", "purple", "black"),
+  #        lty = c(1, 2, 1, 1, 1), lwd = c(1.5, 1.5, 1.5, 1.5, 2),
+  #        bty = "n", cex = 0.8)
 }
 
 # ---- 4 plots in 1 window ----

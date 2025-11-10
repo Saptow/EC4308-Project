@@ -174,11 +174,11 @@ plot_ardl_bench <- function(res_bic, res_fixed, res_maf, res_marx, real,
   lines(obj[, "ARDL-Fixed"], col = "red",    lwd = 1.5, lty = 2)
   lines(obj[, "ARDL-MAF"],   col = "green",  lwd = 1.5)
   lines(obj[, "ARDL-MARX"],  col = "purple", lwd = 1.5)
-  legend("topright",
-         legend = c("ARDL-BIC", "ARDL-Fixed", "ARDL-MAF", "ARDL-MARX", "Actual"),
-         col = c("blue", "red", "green", "purple", "black"),
-         lty = c(1, 2, 1, 1, 1), lwd = c(1.5, 1.5, 1.5, 1.5, 2),
-         bty = "n", cex = 0.8)
+  # legend("topright",
+  #        legend = c("ARDL-BIC", "ARDL-Fixed", "ARDL-MAF", "ARDL-MARX", "Actual"),
+  #        col = c("blue", "red", "green", "purple", "black"),
+  #        lty = c(1, 2, 1, 1, 1), lwd= c(1.5, 1.5, 1.5, 1.5, 2),
+  #        bty = "n", cex = 0.5)
 }
 
 # ---- 4 plots in 1 window ----

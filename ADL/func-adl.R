@@ -53,12 +53,12 @@ make_design <- function(y_raw, X, p, q, h, dummy_name = "aft_break") {
 fit_fixed <- function(y, X, p, q, h) {
   dm <- make_design(y, X, p, q, h)
   if (nrow(dm$Z) < (p + 1)) stop("Not enough data for given p, q.")
-  model <- stats::lm(y_lead ~ . , data = dm$Z)
+  model <- lm(y_lead ~ . , data = dm$Z)
   # last predictor row (drop target)
   last_pred <- as.data.frame(dm$Z[nrow(dm$Z), setdiff(colnames(dm$Z), "y_lead"), drop = FALSE])
-  pred  <- as.numeric(stats::predict(model, newdata = last_pred))
-  list(model = model, pred = pred, coef = stats::coef(model),
-       p = p, q = q, bic = stats::BIC(model))
+  pred  <- as.numeric(predict(model, newdata = last_pred))
+  list(model = model, pred = pred, coef = coef(model),
+       p = p, q = q, bic = BIC(model))
 }
 
 # ============================================
@@ -194,17 +194,6 @@ ardl.rolling.window <- function(Y, X = NULL,
     y_idx_end   <- N - i
     Y.window <- Y[y_idx_start:y_idx_end, , drop = FALSE]
     X.window <- if (is.null(X)) NULL else X[y_idx_start:y_idx_end, , drop = FALSE]
-
-    # # Check X 
-    # if (!is.null(X.window)) {
-    #   cat(sprintf("Window %d:%d - Y rows: %d, X rows: %d\n",
-    #               y_idx_start, y_idx_end,
-    #               nrow(Y.window), nrow(X.window)))
-    #   if (nrow(X.window) != nrow(Y.window)) {
-    #     stop(sprintf("X and Y row mismatch in window: %d vs %d",
-    #                  nrow(X.window), nrow(Y.window)))
-    #   }
-    # }
     
     # Fit ADL model
     fit <- try(

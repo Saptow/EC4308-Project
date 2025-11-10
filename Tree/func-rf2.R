@@ -80,10 +80,10 @@ runrf = function(Y, h, target_name = "UNRATE") {
   # 4) Fit RF and predict
   X <- as.data.frame(X, check.names = FALSE)
   X_out <- X[0, , drop = FALSE]; X_out[1, ] <- as.numeric(X_new)
-  model <- randomForest::randomForest(x = X, y = y, importance = TRUE)
+  model <- ranger(x = X,y = y,importance = "permutation", max.depth=5, mtry=floor(ncol(X)/3))
   pred  <- predict(model, X_out)
   
-  list(model = model, pred = pred, pca = pca, n_pc = n_pc, 
+  list(model = model, pred = pred$predictions, pca = pca, n_pc = n_pc, 
        var_exp = var_exp, pca_vars = pca_vars)
 }
 

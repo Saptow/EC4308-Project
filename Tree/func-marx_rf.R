@@ -75,10 +75,10 @@ run_marxrf = function(Y, h, target_name = 'UNRATE') {
   ), check.names = FALSE)
   
   # Fit RF and predict
-  rf   <- randomForest(x = X_train, y = y_target, importance = TRUE)
+  rf <- ranger(x = X_train, y = y_target, importance = "permutation", max.depth = 5, mtry = floor(ncol(X_train) / 3))
   pred <- predict(rf, X_new)
   
-  list(model = rf, pred  = pred, importance = importance(rf),X_new = X_new)
+  list(model = rf, pred  = pred$predictions, importance = importance(rf),X_new = X_new)
   
 }
 

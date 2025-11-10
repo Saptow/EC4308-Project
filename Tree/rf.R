@@ -1,17 +1,14 @@
 # Random forest forecast
 
 # load FRED-MD data
-load("data/fredmd.RData")
-library(randomForest)
-
+load("./data/fredmd_cleaned.RData")
+library(ranger)
 Y = md
-Y = Y[,-59] #drop New Orders for Consumer Goods (ACOGNO) due to insufficient data
 
 #Create dummy variable after Nov 2010 to handle structural break
-cutoff = as.Date("2010-11-01")
-Y$DUM = ifelse(Y[, 1] > cutoff, 1, 0)
 nprev = 120 #test size
-
+# Rename aft_break to DUM for script consistency
+names(Y)[names(Y) == "aft_break"] <- "DUM"
 ####################################################################################
 
 #Use random forest 2 (base)

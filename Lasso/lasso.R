@@ -32,7 +32,7 @@ runlasso=function(Y,indice,lag,alpha=1,IC="bic"){
   
   dum=Y[,ncol(Y)] # extract dummy from data
   Y=Y[,-ncol(Y)] #data without the dummy
-  comp=princomp(scale(Y,scale=FALSE)) # compute principal components to add as predictors
+  comp=prcomp(scale(Y,scale=FALSE)) # compute principal components to add as predictors
   Y2=cbind(Y,comp$scores[,1:8]) #augment predictors by the first 8 principal components
   aux=embed(Y2,4+lag) #create 4 lags + forecast horizon shift (=lag option)
   y=aux[,indice] #  Y variable aligned/adjusted for missing data due do lags
