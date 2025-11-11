@@ -3,8 +3,6 @@ load("data/fredmd_cleaned.RData")
 source("data_transformation/marx_transform.R") 
 
 library(glmnet)
-library(HDeconometrics)
-library(sandwich) #library to estimate variance for DM test regression using NeweyWest()
 library(hdm)
 
 Y = md
@@ -14,8 +12,7 @@ nprev = 120 #test size
 #LASSO-MARX AND ROLLING WINDOW FUNCTION
 ########################################
 run_marxlasso <- function(Y, h, target_name = 'UNRATE',
-                          L_y = 4, P_marx = 4,
-                          alpha = 1, IC = "bic") {
+                          L_y = 4, P_marx = 4) {
   
   # 0) Drop date; split into train (1..T-1) and last row T for prediction
   Y <- subset(Y, select = -date)
@@ -132,13 +129,12 @@ run_marxlasso <- function(Y, h, target_name = 'UNRATE',
   newx        <- newx[,        keep, drop = FALSE]
   
   # 6) Fit LASSO by information criterion & predict
-  fit <- HDeconometrics::ic.glmnet(
+  fit <- rlasso(
     x     = as.matrix(X_train_mat),
     y     = y_target,
-    crit  = IC,
-    alpha = alpha
+    post = FALSE
   )
-  pred <- as.numeric(predict(fit, newx = as.matrix(newx)))
+  pred <- as.numeric(predict(fit, newdata = as.matrix(newx)))
   
   # Sparse coefs as named vector
   cf <- as.numeric(fit$coef); names(cf) <- rownames(fit$coef)
@@ -151,7 +147,6 @@ run_marxlasso <- function(Y, h, target_name = 'UNRATE',
 marx_lasso.rolling.window <- function(Y, nprev, h = 1,
                                       target_name = "UNRATE",
                                       L_y = 4, P_marx = 4,
-                                      alpha = 1, IC = "bic",
                                       verbose = TRUE) {
   save.pred <- rep(NA_real_, nprev)
   save.coef <- vector("list", nprev)
@@ -168,9 +163,7 @@ marx_lasso.rolling.window <- function(Y, nprev, h = 1,
       h            = h,
       target_name  = target_name,
       L_y          = L_y,
-      P_marx       = P_marx,
-      alpha        = alpha,
-      IC           = IC
+      P_marx       = P_marx
     )
     
     # book-keeping indices: match your RF code
@@ -207,20 +200,26 @@ marx_lasso.rolling.window <- function(Y, nprev, h = 1,
 }
 
 ############################################################################
-#Penalized regression: LASSO-MAF forecasts (BIC, AIC, AICc)
+#Penalized regression: LASSO-MAF forecasts 
 ############################################################################
-
-alpha=1 #set alpha=1 for LASSO
 
 #Run forecasts for MARX-LASSO (BIC)
 marx_lasso1c=marx_lasso.rolling.window(Y,nprev,h=1,target_name = "UNRATE",
-                                  L_y = 4, P_marx = 4, alpha,IC="bic")
+                                  L_y = 4, P_marx = 4)
 marx_lasso3c=marx_lasso.rolling.window(Y,nprev,h=3,target_name = "UNRATE",
-                                       L_y = 4, P_marx = 4, alpha,IC="bic")
+                                       L_y = 4, P_marx = 4)
 marx_lasso6c=marx_lasso.rolling.window(Y,nprev,h=6,target_name = "UNRATE",
-                                       L_y = 4, P_marx = 4, alpha,IC="bic")
+                                       L_y = 4, P_marx = 4)
 marx_lasso12c=marx_lasso.rolling.window(Y,nprev,h=12,target_name = "UNRATE",
-                                       L_y = 4, P_marx = 4, alpha,IC="bic")
+                                       L_y = 4, P_marx = 4)
 
+##rmse
+lassomarx.rmse1=marx_lasso1c$errors[1]
+lassomarx.rmse3=marx_lasso3c$errors[1]
+lassomarx.rmse6=marx_lasso6c$errors[1]
+lassomarx.rmse12=marx_lasso12c$errors[1]
 
-
+print(lassomarx.rmse1)
+print(lassomarx.rmse3)
+print(lassomarx.rmse6)
+print(lassomarx.rmse12)

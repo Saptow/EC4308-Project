@@ -3,8 +3,6 @@ load("data/fredmd_cleaned.RData")
 source("data_transformation/maf_transform.R") 
 
 library(glmnet)
-library(HDeconometrics)
-library(sandwich) #library to estimate variance for DM test regression using NeweyWest()
 library(hdm)
 
 Y = md
@@ -15,8 +13,8 @@ nprev = 120 #test size
 ########################################
 
 run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
-                         L_y = 4, P_maf = 4,
-                         alpha = 1, IC = "bic") {
+                         L_y = 4, P_maf = 4
+                         ) {
   
   # Drop date; split train (1..T-1) and last row T for prediction
   Y <- subset(Y, select = -date)
@@ -123,13 +121,12 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
   newx        <- newx[,        keep, drop = FALSE]
   
   # 6) Fit LASSO by information criterion & predict
-  fit <- HDeconometrics::ic.glmnet(
+  fit <- rlasso(
     x     = as.matrix(X_train_mat),
     y     = y_target,
-    crit  = IC,
-    alpha = alpha
+    post = FALSE
   )
-  pred_raw <- predict(fit, newx = as.matrix(newx), s = fit$lambda)
+  pred_raw <- predict(fit, newdata = as.matrix(newx), s = fit$lambda)
   pred <- drop(pred_raw)
   if (length(pred) != 1L) pred <- pred[1L]
   
@@ -192,18 +189,27 @@ maf_lasso.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE",
 }
 
 ############################################################################
-#Penalized regression: LASSO-MAF forecasts (BIC, AIC, AICc)
+#Penalized regression: LASSO-MAF forecasts 
 ##########################################################################
 
-alpha=1 #set alpha=1 for LASSO
-
-#Run forecasts for MAF-LASSO (BIC)
+#Run forecasts for MAF-LASSO 
 maf_lasso1c=maf_lasso.rolling.window(Y,nprev,h=1,target_name = "UNRATE",
-                                       L_y = 4, P_maf = 4, alpha,IC="bic")
+                                       L_y = 4, P_maf = 4)
 maf_lasso3c=maf_lasso.rolling.window(Y,nprev,h=3,target_name = "UNRATE",
-                                     L_y = 4, P_maf = 4, alpha,IC="bic")
+                                     L_y = 4, P_maf = 4)
 maf_lasso6c=maf_lasso.rolling.window(Y,nprev,h=6,target_name = "UNRATE",
-                                     L_y = 4, P_maf = 4, alpha,IC="bic")
+                                     L_y = 4, P_maf = 4)
 maf_lasso12c=maf_lasso.rolling.window(Y,nprev,h=12,target_name = "UNRATE",
-                                     L_y = 4, P_maf = 4, alpha,IC="bic")
+                                     L_y = 4, P_maf = 4)
 
+
+##rmse
+lassomaf.rmse1=maf_lasso1c$errors[1]
+lassomaf.rmse3=maf_lasso3c$errors[1]
+lassomaf.rmse6=maf_lasso6c$errors[1]
+lassomaf.rmse12=maf_lasso12c$errors[1]
+
+print(lassomaf.rmse1)
+print(lassomaf.rmse3)
+print(lassomaf.rmse6)
+print(lassomaf.rmse12)

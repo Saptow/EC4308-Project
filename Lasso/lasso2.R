@@ -4,7 +4,6 @@ load("data/fredmd_cleaned.RData")
 
 library(glmnet)
 library(HDeconometrics)
-library(sandwich) #library to estimate variance for DM test regression using NeweyWest()
 library(hdm)
 
 Y = md
