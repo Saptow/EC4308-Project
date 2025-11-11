@@ -92,3 +92,8 @@ avg_nonzero <- c(
   h12 = mean(c12c, na.rm = TRUE)
 )
 avg_nonzero
+
+save(lasso1c, file="lasso_h1.RData")
+save(lasso3c, file="lasso_h3.RData")
+save(lasso6c, file="lasso_h6.RData")
+save(lasso12c, file="lasso_h12.RData")
