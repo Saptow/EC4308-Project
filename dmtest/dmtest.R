@@ -636,3 +636,37 @@ best_overall_model_adl <- names(dm_avg_vs_adl)[best_overall_idx_adl]
 best_overall_dm_adl <- dm_avg_vs_adl[best_overall_idx_adl]
 cat(sprintf("Best Model: %s (Average DM = %.3f)\n", 
             best_overall_model_adl, best_overall_dm_adl))
+
+## Add this after your STEP 5: Display Results section
+
+# STEP 5.5: Add critical value comparison at 5% significance level
+# Critical value for two-tailed test at 5% significance level
+critical_value <- 1.96
+
+cat("DM TEST RESULTS vs AR BENCHMARK\n")
+cat("Critical value (5% level): ±1.96\n")
+print(round(dm_results_vs_ar, 3))
+
+cat("\nSignificant at 5% level (|DM| > 1.96):\n")
+sig_matrix_ar <- ifelse(abs(dm_results_vs_ar) > critical_value, "YES", "NO")
+print(sig_matrix_ar)
+
+cat("DM TEST RESULTS vs ADL BENCHMARK\n")
+cat("Critical value (5% level): ±1.96\n")
+print(round(dm_results_vs_adl, 3))
+
+cat("\nSignificant at 5% level (|DM| > 1.96):\n")
+sig_matrix_adl <- ifelse(abs(dm_results_vs_adl) > critical_value, "YES", "NO")
+print(sig_matrix_adl)
+
+# Summary count
+cat("\n========================================\n")
+cat("SUMMARY: Significant Results at 5% Level\n")
+cat("========================================\n")
+cat(sprintf("vs AR:  %d out of %d tests are significant\n", 
+            sum(abs(dm_results_vs_ar) > critical_value),
+            length(dm_results_vs_ar)))
+
+cat(sprintf("vs ADL: %d out of %d tests are significant\n", 
+            sum(abs(dm_results_vs_adl) > critical_value),
+            length(dm_results_vs_adl)))
