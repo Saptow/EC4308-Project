@@ -226,7 +226,7 @@ run_dm_test_vs_ar <- function(model_name, loss_ar, loss_model, plot_results = TR
   ))
 }
 
-# Wrapper Function 1: Run full DM test for model vs ADL without PCA 
+# Wrapper Function 2: Run full DM test for model vs ADL without PCA 
 run_dm_test_vs_adl <- function(model_name, loss_adl, loss_model, plot_results = TRUE) {
   
   horizons <- c("1c", "3c", "6c", "12c")
@@ -269,6 +269,46 @@ run_dm_test_vs_adl <- function(model_name, loss_adl, loss_model, plot_results = 
             cex.axis = 1.2, nc = 2, xlab = "Year") 
   }
   
+  return(list(
+    dm_stats = dm_stats,
+    dm_objects = dm_objects,
+    loss_diffs = loss_diffs
+  ))
+}
+
+# Wrapper Function 3: Run full DM test for model vs any benchmark
+run_dm_test <- function(model_name1, model_name2, loss_model1, loss_model2, plot_results = TRUE) {
+  
+  # Horizons
+  horizons <- c("1c", "3c", "6c", "12c")
+  horizon_names <- c("1-step", "3-step", "6-step", "12-step")
+  
+  # Storage for results
+  dm_stats <- numeric(4)
+  dm_objects <- list()
+  loss_diffs <- list()
+  
+  # Loop through horizons
+  for (i in 1:4) {
+    h <- horizons[i]
+    
+    # Compute loss differential (AR - Model)
+    loss_diff <- loss_model1[[h]] - loss_model2[[h]]
+    loss_diffs[[h]] <- loss_diff
+    
+    # DM regression
+    dm_reg <- lm(loss_diff ~ 1)
+    dm_objects[[h]] <- dm_reg
+    
+    # Compute DM statistic
+    dm_stat <- as.numeric(dm_reg$coefficients / sqrt(NeweyWest(dm_reg, lag = 5)))
+    dm_stats[i] <- dm_stat
+    
+    # Print result
+    cat(sprintf("%s vs %s - %s: DM = %.3f\n", model_name1, model_name2, horizon_names[i], dm_stat))
+  }
+  
+  # Return results
   return(list(
     dm_stats = dm_stats,
     dm_objects = dm_objects,
@@ -670,3 +710,19 @@ cat(sprintf("vs AR:  %d out of %d tests are significant\n",
 cat(sprintf("vs ADL: %d out of %d tests are significant\n", 
             sum(abs(dm_results_vs_adl) > critical_value),
             length(dm_results_vs_adl)))
+
+
+cat("\n--- Vanilla Models Comparison ---\n")
+dm_lasso_bench_vs_rf_bench <- run_dm_test("LASSO", "RF", loss_lasso_bench, loss_rf_bench)
+dm_lasso_bench_vs_hybrid_bench   <- run_dm_test("LASSO", "HYBRID",loss_lasso_bench, loss_hybrid_bench)
+dm_rf_bench_vs_hybrid_bench  <- run_dm_test("RF", "HYBRID", loss_rf_bench, loss_hybrid_bench)
+
+cat("\n--- Variable Transformations Comparison ---\n")
+dm_lasso_bench_vs_lasso_maf <- run_dm_test("LASSO", "LASSO MAF", loss_lasso_bench, loss_lasso_maf)
+dm_lasso_bench_vs_lasso_marx <- run_dm_test("LASSO", "LASSO MARX", loss_lasso_bench, loss_lasso_marx)
+
+dm_rf_bench_vs_rf_maf  <- run_dm_test("RF", "RF MAF",loss_rf_bench, loss_rf_maf)
+dm_rf_bench_vs_rf_marx <- run_dm_test("RF", "RF MARX", loss_rf_bench, loss_rf_marx)
+
+dm_hybrid_bench_vs_hybrid_maf  <- run_dm_test("HYBRID", "HYBRID MAF",loss_hybrid_bench, loss_hybrid_maf)
+dm_hybrid_bench_vs_hybrid_marx <- run_dm_test("HYBRID", "HYBRID MARX", loss_hybrid_bench, loss_hybrid_marx)
