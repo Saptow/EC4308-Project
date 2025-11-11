@@ -91,13 +91,12 @@ runlasso <- function(Y, h = 1, target_name = "UNRATE", alpha = 1, IC = "bic") {
   colnames(newx)[ncol(newx)] <- dum_name
   
   # 4) Fit LASSO via IC and predict
-  fit <- HDeconometrics::ic.glmnet(
+  fit <- rlasso(
     x     = as.matrix(X_train_mat),
     y     = y,
-    crit  = IC,
-    alpha = alpha
+    post = FALSE
   )
-  pred <- as.numeric(predict(fit, newx = as.matrix(newx)))
+  pred <- as.numeric(predict(fit, newdata = as.matrix(newx)))
   
   list(model = fit, pred = pred, pca = pca, n_pc = n_pc,
        var_exp = var_exp, pca_vars = pca_vars)
@@ -108,8 +107,8 @@ runlasso <- function(Y, h = 1, target_name = "UNRATE", alpha = 1, IC = "bic") {
 ######################################
 
 # Rolling window wrapper mirroring your rf2.rolling.window()
-lasso.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE",
-                                  alpha = 1, IC = "bic") {
+lasso.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE")
+  {
   save.pred <- rep(NA_real_, nprev)
   save.pca      <- vector("list", nprev)
   save.n_pc     <- integer(nprev)
