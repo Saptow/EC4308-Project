@@ -47,27 +47,24 @@ runhybrid <- function(X, h=1, L_y=4, target_name="UNRATE"){
     Y2_predrow <- cbind(y = X_out[, ind, drop = FALSE][, 1], pcs_t, DUM = dum_t[, 1])
     Y2_all <- rbind(as.matrix(Y2_train), as.matrix(Y2_predrow))
 
-    # 3) Create lagged design and apply horizon fix for h-step forecast
+    # Create lagged design matrix
     k <- max(L_y, L_pc) + h
     aux <- embed(as.matrix(Y2_all), k)
     
     base_names <- colnames(Y2_train)  # c("y","PC1",...,"DUM")
     colnames(aux) <- unlist(lapply(0:(k-1), function(L) paste0(base_names, "_L", L)))
 
-    # Drop first h blocks (L0..L(h-1)); target is y_Lh
     block   <- ncol(Y2_all)
     aux2    <- aux[, -(seq_len(block * h)), drop = FALSE]
     y_col   <- paste0("y_L", h)
     if (!y_col %in% colnames(aux2)) stop("Target column not found after horizon fix.")
 
-    # Keep ONLY contemporaneous dummy
     all_feat_cols <- setdiff(colnames(aux2), y_col)
     dum_cols_all  <- grep("^DUM_L", colnames(aux2), value = TRUE)
     dum_keep      <- paste0("DUM_L", h)
     dum_drop      <- setdiff(dum_cols_all, dum_keep)
     feat_cols     <- setdiff(all_feat_cols, dum_drop)
 
-    # Split y, X (train) and X_new (last row)
     y     <- as.numeric(aux2[1:(nrow(aux2) - 1), y_col])
     X     <- aux2[1:(nrow(aux2) - 1), feat_cols, drop = FALSE]
     X_new <- aux2[nrow(aux2),          feat_cols, drop = FALSE]

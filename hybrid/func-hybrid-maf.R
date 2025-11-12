@@ -15,7 +15,6 @@ runhybrid_maf <- function(X, h=1, L_y=4, P_maf=4, target_name="UNRATE"){
 
     X_train_raw <- as.matrix(X_in[, setdiff(seq_len(ncol(X_in)), c(ind, dum_idx)), drop=FALSE])
     source("./data_transformation/maf_transform.R")
-    # Assert numeric X_train_raw
     X_train_raw <- apply(X_train_raw, 2, as.numeric)
     maf_train <- maf_transform(X_train_raw, P_maf = P_maf, scale_data = TRUE)
     y_in <- as.numeric(X_in[, ind, drop=FALSE])
@@ -70,7 +69,7 @@ runhybrid_maf <- function(X, h=1, L_y=4, P_maf=4, target_name="UNRATE"){
     ), check.names = FALSE)
     
 
-    # 5) Standardise based on training set (except dummy)
+    # Standardise based on training set
     dum_name <- colnames(X_in)[dum_idx]
     non_dummy_cols <- setdiff(colnames(X_train_df), dum_name)
     
@@ -78,7 +77,7 @@ runhybrid_maf <- function(X, h=1, L_y=4, P_maf=4, target_name="UNRATE"){
     X_non_new   <- as.matrix(X_new_df[,   non_dummy_cols, drop = FALSE])
     means <- colMeans(X_non_train, na.rm = TRUE)
     sds   <- apply(X_non_train, 2, sd)
-    sds[!is.finite(sds) | sds == 0] <- 1  # avoid division by zero
+    sds[!is.finite(sds) | sds == 0] <- 1  
     
     X_train_mat <- cbind(
         sweep(sweep(X_non_train, 2, means, "-"), 2, sds, "/"),
@@ -102,6 +101,7 @@ runhybrid_maf <- function(X, h=1, L_y=4, P_maf=4, target_name="UNRATE"){
     rlasso.fit <- rlasso(as.matrix(X_train_mat), y_target, post=FALSE)
     rhat.rlasso <- rlasso.fit$residuals
     rlasso.pred <- predict(rlasso.fit, newdata=as.matrix(newx))
+    
     # Second stage: fit RF on rLASSO residuals (use p/3 for regression)
     df_rf_train <- cbind.data.frame(rhat=rhat.rlasso, X_train_mat)
     rf_resid <- ranger(

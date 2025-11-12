@@ -18,7 +18,7 @@ make_design <- function(y_raw, X, p, q, h,
                         pca_cap = 50) {
   x_dimred <- match.arg(x_dimred)
 
-  # y-lags (do not overwrite raw series)
+  # y-lags
   y_lags <- if (p > 0) {
     yl <- embed(y_raw, p + 1)
     colnames(yl) <- c("L0.y", paste0("L", 1:p, ".y"))
@@ -55,7 +55,6 @@ make_design <- function(y_raw, X, p, q, h,
           pca_vars <- colnames(X_wo)
           X_use <- pcs
         } else {
-          # fallback to raw X if PCA rank is degenerate
           X_use <- X_wo
         }
       } else {
@@ -71,11 +70,10 @@ make_design <- function(y_raw, X, p, q, h,
       colnames(tmp) <- paste0(base, "_", lags)
       x_lags <- rbind(matrix(NA_real_, nrow = q, ncol = ncol(tmp)), tmp)
 
-      # contemporaneous dummy (L0 only) stays unlagged in the design
+      # contemporaneous dummy 
       X_block <- cbind(setNames(dum_col, dummy_name), x_lags)
 
     } else {
-      # prebuilt features (MAF/MARX) – assume already aligned/padded
       X_block <- as.matrix(X)
     }
   } else {
@@ -98,7 +96,7 @@ fit_fixed <- function(y, X, p, q, h,
   if (nrow(dm$Z) < (p + 1)) stop("Not enough data for given p, q.")
   model <- lm(y_lead ~ . , data = dm$Z)
 
-  # last predictor row (drop target)
+
   last_pred <- as.data.frame(dm$Z[nrow(dm$Z), setdiff(colnames(dm$Z), "y_lead"), drop = FALSE])
   pred  <- as.numeric(predict(model, newdata = last_pred))
 
@@ -112,12 +110,10 @@ fit_fixed <- function(y, X, p, q, h,
 # ============================================
 runARDL <- function(Y, X = NULL, indice = 1,
                     h = 1,
-                    type = c("fixed","maf","marx"),
+                    type = c("fixed"),
                     p_fixed = 4,
                     q_fixed = 4,
                     use_x0 = TRUE,
-                    P_maf = 4,
-                    marx_q = 4,
                     x_dimred = c("none","pca"),
                     pca_var = 0.90,
                     pca_cap = 50,
@@ -137,32 +133,6 @@ runARDL <- function(Y, X = NULL, indice = 1,
     ))
   }
 
-  if (type == "maf") {
-    source("./data_transformation/maf_transform.R")
-    dum <- X[, dummy_name, drop = FALSE]
-    X_wo <- X[, colnames(X) != dummy_name, drop = FALSE]
-    X_maf <- maf_transform(X_wo, P_maf = P_maf, scale_data = TRUE)
-    dum_aligned <- dum[-seq_len(P_maf - 1), , drop = FALSE]
-    X_maf  <- cbind(tmp_dummy = dum_aligned[,1], X_maf)
-    colnames(X_maf)[1] <- dummy_name
-    X_maf <- pad_top_na(X_maf, length(y))
-    return(fit_fixed(y, X_maf, p = 0, q = 0, h = h,
-                     x_dimred = "none", dummy_name = dummy_name))
-  }
-
-  if (type == "marx") {
-    source("./data_transformation/marx_transform.R")
-    dum <- X[, dummy_name, drop = FALSE]
-    X_wo <- X[, colnames(X) != dummy_name, drop = FALSE]
-    mx <- marx_transform(X_wo, n_lag = marx_q, scale_data = FALSE)
-    X_marx <- mx$mat_x_marx
-    dum_aligned <- dum[-seq_len(marx_q - 1), , drop = FALSE]
-    X_marx <- cbind(tmp_dummy = dum_aligned[,1], X_marx)
-    colnames(X_marx)[1] <- dummy_name
-    X_marx <- pad_top_na(X_marx, length(y))
-    return(fit_fixed(y, X_marx, p = 0, q = 0, h = h,
-                     x_dimred = "none", dummy_name = dummy_name))
-  }
 }
 
 
@@ -172,13 +142,11 @@ ardl.rolling.window <- function(Y, X = NULL,
                                 nprev,
                                 indice = 1,
                                 h = 1,
-                                type = c("fixed", "maf", "marx"),
+                                type = c("fixed"),
                                 x_dimred = c("none","pca"),
                                 p_fixed = 4, q_fixed = 4,
                                 use_x0 = TRUE,
-                                verbose = TRUE,
-                                P_maf = 4,
-                                marx_q = 4) {
+                                verbose = TRUE) {
   # Parse args
   type <- match.arg(type)
   x_dimred <- match.arg(x_dimred)
@@ -214,8 +182,6 @@ ardl.rolling.window <- function(Y, X = NULL,
         type = type,
         p_fixed = p_fixed, q_fixed = q_fixed,
         use_x0 = use_x0,
-        P_maf = P_maf,
-        marx_q = marx_q,
         x_dimred = "pca",
       )
 
@@ -262,7 +228,6 @@ ardl.rolling.window <- function(Y, X = NULL,
       h = h, type = type,
       p_fixed = p_fixed, q_fixed = q_fixed,
       use_x0 = use_x0,
-      P_maf = P_maf, marx_q = marx_q,
       p_chosen = p_used,
       q_chosen = q_used
     )

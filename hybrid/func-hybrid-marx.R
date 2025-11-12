@@ -17,7 +17,6 @@ runhybrid_marx <- function(X, h=1, L_y=4, target_name="UNRATE", P_marx=4){
 
     X_train_raw <- as.matrix(X_in[, setdiff(seq_len(ncol(X_in)), c(ind, dum_idx)), drop=FALSE])
     source("./data_transformation/marx_transform.R")
-    # Assert numeric X_train_raw
     X_train_raw <- apply(X_train_raw, 2, as.numeric)
     mx <- marx_transform(X_train_raw, n_lag = P_marx, scale_data = FALSE)
     X_marx <- mx$mat_x_marx # shd hv T_in - P_marx rows
@@ -47,7 +46,7 @@ runhybrid_marx <- function(X, h=1, L_y=4, target_name="UNRATE", P_marx=4){
     dum_t <- as.numeric(X_in[t_idx, dum_idx, drop=TRUE]) # assert numeric dummy at t
     y_target <- y_in[t_idx + h] # target variable
 
-    # Final design matrix for training (dont impute NA yet)
+    # design matrix for training
     X_train_df <- cbind(
         if (!is.null(y_lags_aligned)) as.data.frame(y_lags_aligned) else NULL,
         as.data.frame(X_marx[marx_rows, , drop=FALSE], check.names=FALSE),
@@ -62,7 +61,7 @@ runhybrid_marx <- function(X, h=1, L_y=4, target_name="UNRATE", P_marx=4){
     X_train_df <- X_train_df[valid_rows, , drop=FALSE] # valid rows only
     y_target   <- y_target[valid_rows] # valid target only
 
-    # Build X_new for forecasting y_{T_in + h}
+    # Build X_new 
     if ((T_in - P_marx) < 1 || (T_in - P_marx) > nrow(X_marx)) {
         stop("Cannot form X_new: window too short relative to P_marx.")
     }
@@ -85,20 +84,18 @@ runhybrid_marx <- function(X, h=1, L_y=4, target_name="UNRATE", P_marx=4){
     # standardise for LASSO (except dummy)
     non_dummy_cols <- setdiff(colnames(X_train_df), "DUM")
 
-    # Ensure numeric matrices for standardisation
     X_non_train <- as.matrix(X_train_df[, non_dummy_cols, drop=FALSE])
     X_non_new   <- as.matrix(X_new_df[,   non_dummy_cols, drop=FALSE])
 
-    # compute means and sds
     means <- colMeans(X_non_train)
     sds <- apply(X_non_train, 2, sd)
-    sds[!is.finite(sds) | sds == 0] <- 1  # avoid division by zero
+    sds[!is.finite(sds) | sds == 0] <- 1  
 
     X_train_mat <- cbind(
         sweep(sweep(X_non_train, 2, means, "-"), 2, sds, "/"), # standardise
         DUM = as.numeric(X_train_df[["DUM"]])
     )
-    colnames(X_train_mat)[ncol(X_train_mat)] <- "DUM" # retain dummy name
+    colnames(X_train_mat)[ncol(X_train_mat)] <- "DUM" 
 
     newx <- cbind(
         sweep(sweep(X_non_new, 2, means, "-"), 2, sds, "/"), # standardise
@@ -111,7 +108,7 @@ runhybrid_marx <- function(X, h=1, L_y=4, target_name="UNRATE", P_marx=4){
     newx <- newx[, keep, drop=FALSE]
 
     # First stage: fit rLASSO to get predictions and residuals
-    rlasso.fit <- rlasso(as.matrix(X_train_mat), y_target, post=FALSE) # assume rlasso pkg loaded
+    rlasso.fit <- rlasso(as.matrix(X_train_mat), y_target, post=FALSE) # assume rlasso pkg loaded (in main file)
     rhat.rlasso <- rlasso.fit$residuals
     rlasso.pred <- predict(rlasso.fit, newdata=as.matrix(newx)) # predict at newx for combining later
 

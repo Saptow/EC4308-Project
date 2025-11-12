@@ -1,4 +1,3 @@
-#setwd()
 load("data/fredmd_cleaned.RData") 
 source("Lasso/func-lasso.R")
 

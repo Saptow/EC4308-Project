@@ -30,7 +30,7 @@ maf_transform <- function(X, P_maf = 4, scale_data = TRUE) {
     k_needed <- which(cum_var >= 0.90)[1]
     if (is.na(k_needed)) k_needed <- length(var_exp)
     
-    # Safety limits: at least 1 PC, at most all available
+    # safe keeping to avoid zero-PC case
     k_keep <- max(1, min(k_needed, length(var_exp)))
     
     maf_j <- pca_j$x[, seq_len(k_keep), drop = FALSE]
@@ -44,7 +44,7 @@ maf_transform <- function(X, P_maf = 4, scale_data = TRUE) {
   
   # Combine all MAFs into one feature matrix
   maf_mat <- do.call(cbind, maf_list)
-  rownames(maf_mat) <- rownames(embed(X[, 1], P_maf))  # optional row alignment
+  rownames(maf_mat) <- rownames(embed(X[, 1], P_maf)) # align rownames
   return(maf_mat)
 }
 

@@ -16,21 +16,20 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
                          L_y = 4, P_maf = 4
                          ) {
   
-  # Drop date; split train (1..T-1) and last row T for prediction
+  # drop date column and split last row for prediction
   Y <- subset(Y, select = -date)
   Y_in  <- Y[-nrow(Y), , drop = FALSE]
   Y_out <- Y[nrow(Y),  , drop = FALSE]
   
-  # Identify target & dummy (dummy = last column)
+  # set target and dummy indices
   idx_y   <- which(colnames(Y_in) == target_name)
   dum_idx <- which(colnames(Y_in) == "aft_break") # dummy var index
   if (length(idx_y) != 1) stop("target_name not found in Y.")
   
-  # 1) MAF on TRAIN X only (exclude target & dummy)
+  # MAF transform + horizon-consistent alignment
   X_train_raw <- as.matrix(Y_in[, setdiff(seq_len(ncol(Y_in)), c(idx_y, dum_idx)), drop = FALSE])
   maf_train <- maf_transform(X_train_raw, P_maf = P_maf, scale_data = TRUE)  # expect (T_in - P_maf) rows
   
-  # 2) Horizon-consistent alignment
   y_in <- as.numeric(Y_in[, idx_y, drop = TRUE])
   T_in <- nrow(Y_in)
   
@@ -42,7 +41,7 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
   maf_rows <- t_idx - P_maf
   
   if (L_y > 0) {
-    y_embed <- embed(y_in, L_y + 1)              # [y_t, y_{t-1}, ..., y_{t-L_y}]
+    y_embed <- embed(y_in, L_y + 1)              
     y_lags  <- y_embed[, -1, drop = FALSE]
     y_rows  <- t_idx - L_y
     y_lags_aligned <- y_lags[y_rows, , drop = FALSE]
@@ -51,17 +50,17 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
     y_lags_aligned <- NULL
   }
   
-  dum_t    <- as.numeric(Y_in[t_idx, dum_idx, drop = TRUE])  # contemporaneous dummy
-  y_target <- y_in[t_idx + h]                                # target y_{t+h}
+  dum_t    <- as.numeric(Y_in[t_idx, dum_idx, drop = TRUE]) 
+  y_target <- y_in[t_idx + h]                                
   
-  # 3) Assemble training design (no NA imputation; we will drop incomplete rows)
+  # build X_train aligned with y_target
   X_train_df <- cbind(
     if (!is.null(y_lags_aligned)) as.data.frame(y_lags_aligned) else NULL,
     as.data.frame(maf_train[maf_rows, , drop = FALSE], check.names = FALSE),
     DUM = dum_t
   )
   
-  # ---- Coulombe-style row TRIM: drop any row with NA in X or y ----
+  # clean X_train and y_target (drop rows with any NA)
   non_dummy_cols <- setdiff(colnames(X_train_df), "DUM")
   X_all_mat <- as.matrix(X_train_df[, c(non_dummy_cols, "DUM"), drop = FALSE])
   good_rows <- complete.cases(X_all_mat) & is.finite(y_target)
@@ -69,7 +68,6 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
   X_train_df <- X_train_df[good_rows, , drop = FALSE]
   y_target   <- y_target[good_rows]
   
-  # 4) Build X_new at t = T_in (must be fully observed; if not, stop)
   if ((T_in - P_maf) < 1 || (T_in - P_maf) > nrow(maf_train)) {
     stop("Cannot form X_new: window too short relative to P_maf.")
   }
@@ -92,7 +90,7 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
     stop("X_new has NA after MAF/lag alignment—per Coulombe, do not impute; fix inputs or reduce P_maf/L_y.")
   }
   
-  # 5) Standardize NON-dummy features  
+  # standardise X (except dummy)
   dum_name <- colnames(Y_in)[dum_idx]
   non_dummy_cols <- setdiff(colnames(X_train_df), dum_name)
   
@@ -101,7 +99,7 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
   
   means <- colMeans(X_non_train)
   sds   <- apply(X_non_train, 2, sd)
-  sds[!is.finite(sds) | sds == 0] <- 1  # guard zero-variance
+  sds[!is.finite(sds) | sds == 0] <- 1 
   
   X_train_mat <- cbind(
     sweep(sweep(X_non_train, 2, means, "-"), 2, sds, "/"),
@@ -115,12 +113,12 @@ run_maflasso <- function(Y, h = 1, target_name = "UNRATE",
   )
   colnames(newx)[ncol(newx)] <- dum_name
   
-  # Drop all-constant columns (after scaling they’re zeros)
+  # drop all-constant columns
   keep <- which(colSums(abs(X_train_mat)) > 0)
   X_train_mat <- X_train_mat[, keep, drop = FALSE]
   newx        <- newx[,        keep, drop = FALSE]
   
-  # 6) Fit LASSO by information criterion & predict
+  # fit lasso model
   fit <- rlasso(
     x     = as.matrix(X_train_mat),
     y     = y_target,
@@ -168,7 +166,7 @@ maf_lasso.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE",
     if (verbose) cat("iteration", pos, "\n")
   }
   
-  # OOS errors over the last nprev points (keep only stored forecasts)
+  # oos evaluation
   real <- Y[, target_idx]
   y_test_full <- tail(real, nprev)
   pred_full   <- save.pred[, 1]

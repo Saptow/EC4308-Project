@@ -26,7 +26,7 @@ marx_transform = function(X, n_lag = 12, scale_data = FALSE) {
   mat_y = matata[,1:n_var]      # current value of X
   mat_x = matata[,-c(1:n_var)]  # Apply lag of X
   
-  #ex-ante scaling, may be desirable in certain applications
+  # ex-ante scaling, may be desirable in certain applications
   if (scale_data) {
     mat_y = as.matrix(scale(mat_y))
     mat_x = as.matrix(scale(mat_x))

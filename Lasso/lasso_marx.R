@@ -1,4 +1,3 @@
-#setwd()
 load("data/fredmd_cleaned.RData") 
 source("data_transformation/marx_transform.R") 
 
@@ -14,37 +13,37 @@ nprev = 120 #test size
 run_marxlasso <- function(Y, h, target_name = 'UNRATE',
                           L_y = 4, P_marx = 4) {
   
-  # 0) Drop date; split into train (1..T-1) and last row T for prediction
+  # drop date column and split last row for prediction
   Y <- subset(Y, select = -date)
   Y_in  <- Y[-nrow(Y), , drop = FALSE]
   Y_out <- Y[nrow(Y),  , drop = FALSE]
-  
-  # Identify target & dummy (dummy = last col)
+
+  # set target and dummy indices
   idx_y   <- which(colnames(Y_in) == target_name)
   dum_idx <- which(colnames(Y_in) == "aft_break") # dummy var index
   if (length(idx_y) != 1) stop("target_name not found in Y.")
   
-  # 1) MARX on TRAIN X only (exclude target & dummy)
+  # marx transform on X (exclude target + dummy)
   X_train_raw <- as.matrix(Y_in[, setdiff(seq_len(ncol(Y_in)), c(idx_y, dum_idx)), drop = FALSE])
   mx <- marx_transform(X_train_raw, n_lag = P_marx, scale_data = FALSE)
-  X_marx <- mx$mat_x_marx   # should have T_in - P_marx rows if coded à la Coulombe
+  X_marx <- mx$mat_x_marx
   
-  # 2) Horizon-consistent alignment
+  # align y lags and target
   y_in <- as.numeric(Y_in[, idx_y, drop = TRUE])
   T_in <- nrow(Y_in)
   
-  # Valid times t (need P_marx and L_y available; and target at t+h must exist)
+  # check time indices
   t_start <- max(P_marx + 1, L_y + 1)
   t_end   <- T_in - h
   if (t_end < t_start) stop("Window too short for chosen h/L_y/P_marx.")
   t_idx <- t_start:t_end
   
-  # Map to MARX rows (Coulombe-style trimming: X_marx row for time t is t - P_marx)
+  # map to marx rows
   marx_rows <- t_idx - P_marx
   
   # y lags aligned with time t
   if (L_y > 0) {
-    y_embed <- embed(y_in, L_y + 1)              # [y_t, y_{t-1}, ..., y_{t-L_y}]
+    y_embed <- embed(y_in, L_y + 1)             
     y_lags  <- y_embed[, -1, drop = FALSE]
     y_rows  <- t_idx - L_y
     y_lags_aligned <- y_lags[y_rows, , drop = FALSE]
@@ -57,14 +56,13 @@ run_marxlasso <- function(Y, h, target_name = 'UNRATE',
   dum_t    <- as.numeric(Y_in[t_idx, dum_idx, drop = TRUE])
   y_target <- y_in[t_idx + h]
   
-  # 3) Assemble training design (no NA imputation)
+  # make design matrix for training
   X_train_df <- cbind(
     if (!is.null(y_lags_aligned)) as.data.frame(y_lags_aligned) else NULL,
     as.data.frame(X_marx[marx_rows, , drop = FALSE], check.names = FALSE),
     DUM = dum_t
   )
   
-  # ---- Coulombe-style row TRIM: drop any row with NA in X or y ----
   non_dummy_cols <- setdiff(colnames(X_train_df), "DUM")
   X_all_mat <- as.matrix(X_train_df[, c(non_dummy_cols, "DUM"), drop = FALSE])
   good_rows <- complete.cases(X_all_mat) & is.finite(y_target)
@@ -73,7 +71,7 @@ run_marxlasso <- function(Y, h, target_name = 'UNRATE',
   X_train_df <- X_train_df[good_rows, , drop = FALSE]
   y_target   <- y_target[good_rows]
   
-  # 4) Build X_new at t = T_in (must be fully observed; if not, stop)
+  # build newx for prediction (last row T)
   if ((T_in - P_marx) < 1 || (T_in - P_marx) > nrow(X_marx)) {
     stop("Cannot form X_new: window too short relative to P_marx.")
   }
@@ -92,12 +90,12 @@ run_marxlasso <- function(Y, h, target_name = 'UNRATE',
     DUM = DUM_new
   ), check.names = FALSE)
   
-  # If the last-row features have NA (rare if upstream data are clean), stop—don’t impute
+  # check newx completeness
   if (any(!complete.cases(X_new_df))) {
     stop("X_new has NA after MARX/lag alignment—per Coulombe, do not impute; fix inputs or reduce P_marx/L_y.")
   }
   
-  # 5) Standardize NON-dummy features only (trees don’t need this; LASSO does)
+  # standardise X (except dummy)
   dum_name <- "DUM"
   non_dummy_cols <- setdiff(colnames(X_train_df), dum_name)
   
@@ -105,10 +103,8 @@ run_marxlasso <- function(Y, h, target_name = 'UNRATE',
   X_non_train <- as.matrix(X_train_df[, non_dummy_cols, drop = FALSE])
   X_non_new   <- as.matrix(X_new_df[,   non_dummy_cols, drop = FALSE])
   
-  # Means/SDs (no NA left by construction)
   means <- colMeans(X_non_train)
   sds   <- apply(X_non_train, 2, sd)
-  # guard zero-variance
   sds[!is.finite(sds) | sds == 0] <- 1
   
   X_train_mat <- cbind(
@@ -123,12 +119,11 @@ run_marxlasso <- function(Y, h, target_name = 'UNRATE',
   )
   colnames(newx)[ncol(newx)] <- dum_name
   
-  # Drop all-constant columns (after scaling they’re zeros)
   keep <- which(colSums(abs(X_train_mat)) > 0)
   X_train_mat <- X_train_mat[, keep, drop = FALSE]
   newx        <- newx[,        keep, drop = FALSE]
   
-  # 6) Fit LASSO by information criterion & predict
+  # fit lasso model
   fit <- rlasso(
     x     = as.matrix(X_train_mat),
     y     = y_target,
@@ -166,7 +161,6 @@ marx_lasso.rolling.window <- function(Y, nprev, h = 1,
       P_marx       = P_marx
     )
     
-    # book-keeping indices: match your RF code
     t   <- nrow(Y) - i      # last in-sample index
     u   <- t + h            # forecasted index
     pos <- u - (nrow(Y) - nprev)

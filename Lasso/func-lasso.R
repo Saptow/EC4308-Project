@@ -5,22 +5,22 @@ runlasso <- function(Y, h = 1, target_name = "UNRATE", alpha = 1, IC = "bic") {
   L_y  <- 4
   L_pc <- L_y
   
-  # 0) Drop date; split into train (1..T-1) and last row T
+  # drop date and leave last row for prediction
   Y <- subset(Y, select = -date)
   Y_in  <- Y[-nrow(Y), , drop = FALSE]
   Y_out <- Y[nrow(Y),  , drop = FALSE]
   
-  # Identify target & dummy (dummy = last col)
+  # set target and dummy indices
   indice  <- which(colnames(Y_in) == target_name)
   dum_idx <- which(colnames(Y_in) == "aft_break") # dummy var index
   
-  # 1) y and X for PCA (exclude target + dummy)
+  # separate y and X
   y_train     <- Y_in[, indice, drop = FALSE]
   pca_cols    <- setdiff(seq_len(ncol(Y_in)), c(indice, dum_idx))
   X_train_raw <- Y_in[, pca_cols, drop = FALSE]
   pca_vars    <- colnames(X_train_raw)
   
-  # 2) PCA on TRAIN ONLY (X only)
+  # pca on X_train
   X_train_sc <- scale(X_train_raw, center = TRUE, scale = TRUE)
   max_pc <- min(ncol(X_train_sc), nrow(X_train_sc) - 1)
   pca <- prcomp(X_train_sc, center = FALSE, scale. = FALSE, rank. = max_pc)
@@ -47,14 +47,14 @@ runlasso <- function(Y, h = 1, target_name = "UNRATE", alpha = 1, IC = "bic") {
   Y2_predrow <- cbind(y = Y_out[, indice, drop = FALSE][, 1], pcs_t, DUM = dum_t[, 1])
   Y2_all <- rbind(as.matrix(Y2_train), as.matrix(Y2_predrow))
   
-  # 3) Create lagged design and apply horizon fix for h-step forecast
+  # create lagged design matrix
   k <- max(L_y, L_pc) + h
   aux <- embed(as.matrix(Y2_all), k)
   
   base_names <- colnames(Y2_train)  # c("y","PC1",...,"DUM")
   colnames(aux) <- unlist(lapply(0:(k-1), function(L) paste0(base_names, "_L", L)))
   
-  # Drop first h blocks (L0..L(h-1)); target is y_Lh
+  # Drop first h blocks 
   block   <- ncol(Y2_all)
   aux2    <- aux[, -(seq_len(block * h)), drop = FALSE]
   y_col   <- paste0("y_L", h)
@@ -90,7 +90,7 @@ runlasso <- function(Y, h = 1, target_name = "UNRATE", alpha = 1, IC = "bic") {
   newx <- cbind(X_new_sc, DUM = X_new[, dum_name, drop = FALSE])
   colnames(newx)[ncol(newx)] <- dum_name
   
-  # 4) Fit LASSO via IC and predict
+  # fit lasso model
   fit <- rlasso(
     x     = as.matrix(X_train_mat),
     y     = y,
@@ -105,8 +105,6 @@ runlasso <- function(Y, h = 1, target_name = "UNRATE", alpha = 1, IC = "bic") {
 ######################################
 # LASSO Rolling Window
 ######################################
-
-# Rolling window wrapper mirroring your rf2.rolling.window()
 lasso.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE")
   {
   save.pred <- rep(NA_real_, nprev)

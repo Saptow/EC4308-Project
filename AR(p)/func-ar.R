@@ -43,11 +43,9 @@ runAR <- function(Y, h = 1, target_name = "UNRATE", type = "fixed", L_max = 4) {
   lag_names <- paste0("y_L", (h + 1):(h + p))
   X_df <- as.data.frame(cbind(aux[, lag_names, drop = FALSE], DUM = d_aligned))
   
-  # 1) drop zero-variance columns (incl. constant dummy)
   nzv <- vapply(X_df, function(z) var(z) > 0, logical(1))
   X_df <- X_df[, nzv, drop = FALSE]
   
-  # 2) preliminary fit, then remove aliased (non-estimable) terms
   m0 <- lm(y_vec ~ ., data = X_df)
   ali <- alias(m0)$Complete
   if (!is.null(ali)) {
@@ -60,14 +58,11 @@ runAR <- function(Y, h = 1, target_name = "UNRATE", type = "fixed", L_max = 4) {
   df <- data.frame(y = y_vec, X_df, check.names = FALSE)
   model <- lm(y ~ ., data = df)
   
-  # build X_new using only estimable columns (names in coef(model) minus intercept)
+  # build new X for prediction
   keep_terms <- setdiff(names(coef(model)), "(Intercept)")
-  # construct a full row first
   base_row <- as.list(c(as.numeric(aux[nrow(aux), lag_names, drop = FALSE]), DUM = d_new))
   names(base_row)[seq_along(lag_names)] <- lag_names
-  # subset to estimable terms
   X_new <- as.data.frame(as.list(base_row[keep_terms]), check.names = FALSE)
-  # ensure same order
   X_new <- X_new[, keep_terms, drop = FALSE]
   
   pred <- as.numeric(predict(model, newdata = X_new))

@@ -1,5 +1,6 @@
 # AR(p) benchmark model
 
+# This was done early in the project before we modularized the code into functions.
 # load FRED-MD data
 load("data/fredmd.RData")
 
@@ -11,8 +12,6 @@ cutoff = as.Date("2010-11-01")
 Y$DUM = ifelse(Y[, 1] > cutoff, 1, 0)
 nprev = 120 #test size
 
-
-
 source("Ar(p)/func-ar.R")
 # Test using rolling window 
 bar1c=ar.rolling.window(Y, nprev, h = 1, target_name = "UNRATE", type = "bic", L_max=4) #1-step AR forecast
@@ -23,9 +22,9 @@ bar12c=ar.rolling.window(Y, nprev, h = 12, target_name = "UNRATE", type = "bic",
 
 # Plotting
 arcoef.ts=ts(bar1c$coef, start=c(2010,1), end=c(2019,12), freq=12)
-colnames(arcoef.ts)=c("Constant","Phi1","Phi2","Phi3","Phi4") #name columns to distinguish plots
+colnames(arcoef.ts)=c("Constant","Phi1","Phi2","Phi3","Phi4") 
 
-#Plot all the coefficients over time (plot.ts() same as plot, but for time series objects):
+#Plot the AR coefficients over time
 plot.ts(arcoef.ts, main="AR regression coefficients for h=1", cex.axis=1.5)
 
 # Compare actual vs predicted for h=1

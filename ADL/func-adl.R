@@ -38,7 +38,6 @@ make_design <- function(y_raw, X, p, q, h, dummy_name = "aft_break") {
       x_lags <- rbind(matrix(NA_real_, nrow = q, ncol = ncol(tmp)), tmp)
       X_block <- cbind(setNames(X[, dummy_name, drop = FALSE], dummy_name), x_lags)
     } else {
-      # prebuilt features (MAF/MARX) – assume already aligned/padded
       X_block <- as.matrix(X)
     }
   } else {
@@ -66,7 +65,7 @@ fit_fixed <- function(y, X, p, q, h) {
 # ============================================
 runARDL <- function(Y, X = NULL, indice = 1,
                     h = 1,
-                    type = c("bic","fixed","maf","marx"),
+                    type = c("fixed"),
                     p_max = 4,
                     p_fixed = 4,
                     q_max = 4,
@@ -77,7 +76,6 @@ runARDL <- function(Y, X = NULL, indice = 1,
                     marx_q = 4) {
   
   type <- match.arg(type)
-  search_mode <- match.arg(search_mode)
   lag_start <- if (use_x0) 0 else 1
   
   y <- as.numeric(Y[, indice])
@@ -86,74 +84,6 @@ runARDL <- function(Y, X = NULL, indice = 1,
   if (type == "fixed") {
     return(fit_fixed(y, X, p_fixed, q_fixed, h))
   }
-
-  if (type == "maf") {
-    source("./data_transformation/maf_transform.R")
-    dum <- X[, "aft_break", drop = FALSE]
-    X_wo <- X[, colnames(X) != "aft_break", drop = FALSE]
-    X_maf <- maf_transform(X_wo, P_maf = P_maf, scale_data = FALSE)
-    # align dummy and pad to y length
-    dum_aligned <- dum[-seq_len(P_maf - 1), , drop = FALSE]
-    X_maf <- cbind(aft_break = dum_aligned[,1], X_maf)
-    X_maf <- pad_top_na(X_maf, length(y))
-    # # Final checks for X_maf and y
-    # cat(sprintf("MAF X rows: %d, Y length: %d\n",
-    #              nrow(X_maf), length(y)))
-    # if (nrow(X_maf) != length(y)) {
-    #   stop(sprintf("X and Y row mismatch after padding: %d vs %d",
-    #                nrow(X_maf), length(y)))
-    # }
-    return(fit_fixed(y, X_maf, p = 0, q = 0, h = h))
-  }
-  
-  if (type == "marx") {
-    source("./data_transformation/marx_transform.R")
-    dum <- X[, "aft_break", drop = FALSE]
-    X_wo <- X[, colnames(X) != "aft_break", drop = FALSE]
-    mx <- marx_transform(X_wo, n_lag = marx_q, scale_data = FALSE)
-    X_marx <- if (is.list(mx)) mx$mat_x_marx else mx
-    dum_aligned <- dum[-seq_len(marx_q - 1), , drop = FALSE]
-    X_marx <- cbind(aft_break = dum_aligned[,1], X_marx)
-    X_marx <- pad_top_na(X_marx, length(y))
-    return(fit_fixed(y, X_marx, p = 0, q = 0, h = h))
-  }
-  
-  if (type == "bic") {
-    best <- NULL; best_bic <- Inf
-    q_grid <- if (is.null(X)) 0 else {
-      if (q_max < lag_start) integer(0) else c(0, seq.int(lag_start, q_max))
-    }
-    p_seq <- if (search_mode == "q") p_fixed else 1:p_max
-    Kx <- if (is.null(X)) 0 else ncol(X)
-    
-    for (p in p_seq) {
-      for (q in q_grid) {
-        dm <- try(make_design(y, X, p, q, h), silent = TRUE)
-        if (inherits(dm, "try-error")) next
-        
-        # crude min sample size rule
-        min_obs <- max(10, 2 * (p + q * Kx + 1))
-        if (nrow(dm$Z) < min_obs) next
-        
-        model <- try(stats::lm(y_lead ~ . , data = dm$Z), silent = TRUE)
-        if (inherits(model, "try-error")) next
-        
-        bval <- suppressWarnings(stats::BIC(model))
-        if (!is.finite(bval)) next
-        
-        if (bval < best_bic) {
-          last_pred <- as.data.frame(dm$Z[nrow(dm$Z),
-                                          setdiff(colnames(dm$Z), "y_lead"), drop = FALSE])
-          pred <- as.numeric(stats::predict(model, newdata = last_pred))
-          best <- list(model = model, pred = pred, coef = stats::coef(model),
-                       p = p, q = q, bic = bval)
-          best_bic <- bval
-        }
-      }
-    }
-    if (is.null(best)) stop("BIC search failed.")
-    return(best)
-  }
 }
 
 # Rolling Window
@@ -161,14 +91,11 @@ ardl.rolling.window <- function(Y, X = NULL,
                                 nprev,
                                 indice = 1,
                                 h = 1,
-                                type = c("fixed", "bic", "maf", "marx"),
+                                type = c("fixed"),
                                 p_fixed = 4, q_fixed = 0,
-                                p_max = 4, q_max = 4,
                                 use_x0 = TRUE,
                                 verbose = TRUE,
-                                search_mode = c("pq","q"),
-                                P_maf = 4,
-                                marx_q = 4) {
+                                search_mode = c("pq","q")) {
   # Parse args
   type <- match.arg(type)
   search_mode <- match.arg(search_mode)
@@ -202,12 +129,7 @@ ardl.rolling.window <- function(Y, X = NULL,
         h = h,
         type = type,
         p_fixed = p_fixed, q_fixed = q_fixed,
-        p_max = p_max,   q_max = q_max,
-        use_x0 = use_x0,
-        search_mode = search_mode,
-        P_maf = P_maf,
-        marx_q = marx_q
-      ),
+        use_x0 = use_x0),
       silent = TRUE
     )
 
@@ -229,7 +151,6 @@ ardl.rolling.window <- function(Y, X = NULL,
       pred_vec[pos]    <- fit$pred
       p_used[pos]      <- if (!is.null(fit$p)) fit$p else NA_integer_
       q_used[pos]      <- if (!is.null(fit$q)) fit$q else NA_integer_
-      bic_used[pos]    <- if (!is.null(fit$bic) && is.finite(fit$bic)) fit$bic else NA_real_
     }
 
     pos <- pos + 1
@@ -260,11 +181,7 @@ ardl.rolling.window <- function(Y, X = NULL,
     meta = list(
       h = h, type = type,
       p_fixed = p_fixed, q_fixed = q_fixed,
-      p_max = p_max, q_max = q_max, use_x0 = use_x0,
-      P_maf = P_maf, marx_q = marx_q,
-      p_chosen = p_used,
-      q_chosen = q_used,
-      bic = bic_used
+      use_x0 = use_x0
     )
   )
 }

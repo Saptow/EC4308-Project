@@ -7,12 +7,12 @@ run_marxrf = function(Y, h, target_name = 'UNRATE') {
   L_y  = 4 # lags of y to keep
   P_marx = 4 # lags of marx
   
-  # 0) Drop date; split into train (1..T-1) and last row T for prediction
+  # drop date and leave last row for prediction
   Y <- Y[, -1, drop = FALSE] # drop date column
   Y_in  <- Y[-nrow(Y), , drop = FALSE]
   Y_out <- Y[nrow(Y),  , drop = FALSE]
   
-  # Identify target & dummy (dummy = last col)
+  # set target and dummy indices
   indice  <- which(colnames(Y_in) == target_name)
   dum_idx <- ncol(Y_in)
   
@@ -24,18 +24,17 @@ run_marxrf = function(Y, h, target_name = 'UNRATE') {
   # Align features/target for h-step learning
   y_in <- as.numeric(Y_in[, indice, drop = TRUE])
   T_in <- nrow(Y_in)
-  # valid times t for features: t >= max(P_marx+1, L_y+1) and t <= T_in - h
+  # validate time indices
   t_start <- max(P_marx + 1, L_y + 1)
   t_end   <- T_in - h
   if (t_end < t_start) stop("Window too short for chosen h/L_y/P_marx.")
   t_idx <- t_start:t_end
   
   # Map to matrix rows
-  marx_rows <- t_idx - P_marx       # for X_marx
-  # y lags via embed: rows aligned so that row k is [y_t, y_{t-1},...,y_{t-L_y}]
+  marx_rows <- t_idx - P_marx       
   if (L_y > 0) {
     y_embed <- embed(y_in, L_y + 1)
-    y_lags  <- y_embed[, -1, drop = FALSE]        # y_{t-1}..y_{t-L_y}
+    y_lags  <- y_embed[, -1, drop = FALSE]       
     y_rows  <- t_idx - L_y
     y_lags_aligned <- y_lags[y_rows, , drop = FALSE]
     colnames(y_lags_aligned) <- paste0("y_L", 1:L_y)
@@ -46,7 +45,6 @@ run_marxrf = function(Y, h, target_name = 'UNRATE') {
   # Contemporaneous dummy at time t
   dum_t <- as.numeric(Y_in[t_idx, dum_idx, drop = TRUE])
   
-  # Target is y_{t+h}
   y_target <- y_in[t_idx + h]
   
   # Final training design matrix
@@ -55,8 +53,7 @@ run_marxrf = function(Y, h, target_name = 'UNRATE') {
     as.data.frame(X_marx[marx_rows, , drop = FALSE], check.names = FALSE),
     DUM = dum_t
   )
-  
-  # Build X_new for forecasting y_{T_in + h} (use features at t = T_in)
+  # Drop rows with any NA in X or y
   if ((T_in - P_marx) < 1 || (T_in - P_marx) > nrow(X_marx)) {
     stop("Cannot form X_new: window too short relative to P_marx.")
   }
@@ -111,10 +108,10 @@ marx_rf.rolling.window <- function(Y, nprev, h = 1, target_name = "UNRATE", verb
   
   # OOS errors 
   real <- Y[, which(colnames(Y) == target_name)]
-  y_test_full <- tail(real, nprev)       # y_{T-119..T}
+  y_test_full <- tail(real, nprev)      
   pred_full   <- save.pred[, 1]
   
-  # keep only slots where you actually stored a forecast
+  # filter valid (non-NA) forecasts
   valid <- !is.na(pred_full)
   y_test <- y_test_full[valid]
   pred   <- pred_full[valid]

@@ -1,6 +1,4 @@
 rm(list=ls())
-## package for ADL model
-# install.packages("ARDL")
 knitr::opts_chunk$set(echo = TRUE)
 
 ## Load library
@@ -9,7 +7,7 @@ library(dplyr)
 source('./ADL/func-adl-pca.R')
 
 # =============================================================================
-## For our simple ARDL benchmark, we will be using term spread and yield spread
+## This script runs ADL with PCA dimension reduction on the predictors
 # =============================================================================
 
 # Load FRED-MD data
@@ -26,13 +24,14 @@ X <- md %>%
 
 Y <- as.matrix(Y)
 X <- as.matrix(X)
+
 # Set number of out-of-sample forecasts
 nprev=120
 
 # Define horizon windows (in months)
 horizon_windows=c(1,3,6,12)
 
-# Option 2: Run fixed
+# Option 1: Run fixed
 for (h in horizon_windows){
   print(paste0("Running horizon: ", h))
   res_fixed=ardl.rolling.window(
@@ -51,7 +50,7 @@ for (h in horizon_windows){
   save(res_fixed, file = paste0("./ADL/pca_adl_rolling_fixed_h", h, ".RData"))
 }
 
-# Option 3: Run using MAF
+# Option 2: Run using MAF
 for (h in horizon_windows){
   print(paste0("Running horizon: ", h))
   res_maf=ardl.rolling.window(
@@ -69,7 +68,7 @@ for (h in horizon_windows){
   save(res_maf, file = paste0("./ADL/pca_adl_rolling_maf_h", h, ".RData"))
 }
 
-# Option 4: Run using MARX
+# Option 3: Run using MARX
 for (h in horizon_windows){
       print(paste0("Running horizon: ", h))
       res_marx=ardl.rolling.window(
@@ -108,7 +107,7 @@ plot_ardl_bench <- function( res_fixed, res_maf, res_marx, real,
                             h, end = c(2019, 12), freq = 12,
                             ylab = "Change in Unemployment Rate",
                             main = NULL) {
-  # Align lengths across ALL models for safety
+  # Align lengths 
   L <- min(
            length(res_fixed$pred),
            length(res_maf$pred),
@@ -123,7 +122,6 @@ plot_ardl_bench <- function( res_fixed, res_maf, res_marx, real,
   M <- cbind(fixed, maf, marx, true)
   colnames(M) <- c("ARDL-Fixed", "ARDL-MAF", "ARDL-MARX", "True")
 
-  # Fixed end date; ts() infers the start
   obj <- ts(M, end = end, frequency = freq)
 
   if (is.null(main)) main <- sprintf("%d-step Ahead Forecast", h)
@@ -138,20 +136,18 @@ plot_ardl_bench <- function( res_fixed, res_maf, res_marx, real,
   #        legend = c("ARDL-Fixed", "ARDL-MAF", "ARDL-MARX", "Actual"),
   #        col = c("red", "green", "purple", "black"),
   #        lty = c(1, 2, 1, 1, 1), lwd = c(1.5, 1.5, 1.5, 1.5, 2),
-  #        bty = "n", cex = 0.8)
+  #        bty = "n", cex = 0.8) # legend was not done as grid is too small to accomodate
 }
 
-# ---- 4 plots in 1 window ----
-op <- par(mfrow = c(2, 2))          # 2x2 grid
-on.exit(par(op), add = TRUE)        # restore on exit
-
-options(repr.plot.width = 12, repr.plot.height = 8)
+# 2x2 grid settings
+op <- par(mfrow = c(2, 2))          
+on.exit(par(op), add = TRUE)        
 
 real <- as.numeric(Y[, 1])
 end_date <- c(2019, 12)
 
-plot_ardl_bench(res_fixed1,  res_maf1,  res_marx1,  real, h = 1,  end = end_date)
-plot_ardl_bench(  res_fixed3,  res_maf3,  res_marx3,  real, h = 3,  end = end_date)
+plot_ardl_bench( res_fixed1,  res_maf1,  res_marx1,  real, h = 1,  end = end_date)
+plot_ardl_bench( res_fixed3,  res_maf3,  res_marx3,  real, h = 3,  end = end_date)
 plot_ardl_bench( res_fixed6,  res_maf6,  res_marx6,  real, h = 6,  end = end_date)
 plot_ardl_bench( res_fixed12, res_maf12, res_marx12, real, h = 12, end = end_date)
 
@@ -166,7 +162,7 @@ make_perf_table <- function() {
   for (h in horizons) {
     for (model_label in names(model_key)) {
       tag <- model_key[[model_label]]
-      obj_name <- sprintf("res_%s%d", tag, h)  # e.g., res_bic3, res_maf6, etc.
+      obj_name <- sprintf("res_%s%d", tag, h) 
 
       res <- get0(obj_name, inherits = TRUE, ifnotfound = NULL)
 

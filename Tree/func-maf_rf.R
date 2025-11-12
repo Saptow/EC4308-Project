@@ -6,13 +6,12 @@ run_mafrf <- function(Y, h = 1, target_name = "UNRATE") {
   L_y   = 4   # number of lags of y to keep
   P_maf = 4  # number of lags for each X in MAF
   
-  
-  # Drop date; split into train (1..T-1) and last row T for prediction
-  Y <- Y[, -1, drop = FALSE]  # drop date column
+  # drop date and leave last row for prediction
+  Y <- Y[, -1, drop = FALSE]  
   Y_in  <- Y[-nrow(Y), , drop = FALSE]
   Y_out <- Y[nrow(Y),  , drop = FALSE]
   
-  # Identify target & dummy (dummy = last column)
+  # set target and dummy indices
   indice  <- which(colnames(Y_in) == target_name)
   dum_idx <- ncol(Y_in)
   
@@ -52,7 +51,7 @@ run_mafrf <- function(Y, h = 1, target_name = "UNRATE") {
     DUM = dum_t
   )
   
-  # Build X_new for forecasting y_{T_in + h}
+  # Drop rows with any NA in X or y
   if ((T_in - P_maf) < 1 || (T_in - P_maf) > nrow(maf_train)) {
     stop("Cannot form X_new: window too short relative to P_maf.")
   }
@@ -72,7 +71,7 @@ run_mafrf <- function(Y, h = 1, target_name = "UNRATE") {
     DUM = DUM_new
   ), check.names = FALSE)
   
-  # Fit Random Forest and predict
+  # fit random forest model
   rf <- ranger(x = X_train, y = y_target, importance = "permutation", max.depth = 5, mtry = floor(ncol(X_train) / 3))
   pred <- predict(rf, X_new)
   
