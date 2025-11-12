@@ -1,6 +1,6 @@
-load("../data/fredmd.RData")
+load("./data/fredmd.RData")
 
-# Testing for structural breaks (or just looking HAHA)
+# Testing for structural breaks 
 library(strucchange)
 library(ggplot2)
 md$date <- as.Date(md$date)
@@ -10,7 +10,7 @@ unrate_ts <- ts(md$UNRATE,
                           as.numeric(format(min(md$date), "%m"))),
                 frequency = 12)
 
-break_test=breakpoints(unrate~1)
+break_test=breakpoints(unrate_ts~1)
 summary(break_test)
 plot(break_test)
 breaks <- breakpoints(break_test)$breakpoints
@@ -34,7 +34,6 @@ plot_data$date[breaks]
 
 
 # Using Chow's test to test for that exact date
-# Helper: convert a (YYYY, MM) to the observation index in a monthly ts
 index_from_year_month <- function(ts_obj, year, month) {
   st   <- start(ts_obj)         
   freq <- frequency(ts_obj)      # 12 for monthly
@@ -44,9 +43,8 @@ index_from_year_month <- function(ts_obj, year, month) {
 
 i_break <- index_from_year_month(unrate_ts, 2010, 11)
 
-# Chow test for a break in the mean
 sctest(unrate_ts ~ 1, type = "Chow", point = i_break)
 
 X <- data.frame(ardl_bic = as.numeric(bench1.ts[, "ARDL-BIC"]))
 sctest(y ~ ardl_bic, type = "Chow", point = i_break, data = X)
-#p-value is 0.0002375, reject Ho, structural break exists at Nov 2010 (Financial Crisis)
+# p-value is 0.0002375, reject Ho, structural break exists at Nov 2010 (Financial Crisis)
