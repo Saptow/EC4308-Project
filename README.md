@@ -16,7 +16,7 @@ This is the repository for EC4308 Project for Group 9. Code structure is as foll
 1. Each model folder contains R scripts specific to that model.
 2. Ensure you install any required packages before running the scripts. (e.g., `ranger` for Random Forest, check individual scripts for specific package requirements)
 3. Each folder generally contains a main script to run the model and additional helper scripts (`func_/-*.R`) as needed, with the exception of LASSO which uses a single script.
-4. All used data files are stored in the `data/` folder. The `fred.R` script is used to fetch data from the FRED database and do a bit of cleaning and the `structural_breaks.R` script is used to identify structural breaks in the data.
+4. All used data files are stored in the `data/` folder. The `fred.R` script is used to fetch data from the FRED database and do a bit of cleaning and the `structural_breaks.R` script is used to identify structural breaks in the data. Initial data can be found [here](https://www.stlouisfed.org/research/economists/mccracken/fred-databases). 
 5. Variable transformation scripts are located in the `data_transformation/` folder. Implemented according to Coloumbe et al. (2021) Paper *Macroeconomic Data Transformations matter*.
 
 
